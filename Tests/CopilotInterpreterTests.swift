@@ -36,4 +36,11 @@ struct CopilotInterpreterTests {
         #expect(plan.commands.isEmpty)
         #expect(plan.summary.contains("currently"))
     }
+
+    @Test func plansPlainLanguageSelections() {
+        #expect(copilot.plan("Select chain A").commands == ["select chain a"])
+        #expect(copilot.plan("Highlight residue 42").commands == ["select residue 42"])
+        #expect(copilot.plan("Select all oxygen atoms").commands == ["select element O"])
+        #expect(copilot.plan("Choose the ligand").commands == ["select ligand"])
+    }
 }

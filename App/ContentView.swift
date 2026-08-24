@@ -155,10 +155,14 @@ private struct ModelSidebar: View {
 
             Section("Selection") {
                 if workspace.selectedAtoms.isEmpty {
-                    Text("Tap atoms to inspect or measure")
+                    Text("Tap up to four atoms, or select groups with Terminal or Copilot")
                         .foregroundStyle(.secondary)
                 } else {
-                    ForEach(workspace.selectedAtoms) { atom in
+                    if workspace.selectedAtoms.count > 8 {
+                        Label("\(workspace.selectedAtoms.count) atoms selected", systemImage: "checkmark.circle.fill")
+                            .foregroundStyle(.cyan)
+                    }
+                    ForEach(Array(workspace.selectedAtoms.prefix(8))) { atom in
                         VStack(alignment: .leading, spacing: 2) {
                             Text("\(atom.name) · \(atom.element)")
                                 .font(.body.weight(.semibold))
@@ -169,6 +173,14 @@ private struct ModelSidebar: View {
                     }
                     if let distance = workspace.measuredDistance {
                         Label(String(format: "%.2f Å", distance), systemImage: "ruler")
+                            .foregroundStyle(.yellow)
+                    }
+                    if let angle = workspace.measuredAngle {
+                        Label(String(format: "%.2f° angle", angle), systemImage: "angle")
+                            .foregroundStyle(.yellow)
+                    }
+                    if let torsion = workspace.measuredTorsion {
+                        Label(String(format: "%.2f° torsion", torsion), systemImage: "rotate.3d")
                             .foregroundStyle(.yellow)
                     }
                     Button("Clear selection", action: workspace.clearSelection)
@@ -322,6 +334,14 @@ private struct InspectorPanel: View {
                     }
                     if let distance = workspace.measuredDistance {
                         LabeledContent("Distance", value: String(format: "%.3f Å", distance))
+                            .foregroundStyle(.yellow)
+                    }
+                    if let angle = workspace.measuredAngle {
+                        LabeledContent("Angle", value: String(format: "%.3f°", angle))
+                            .foregroundStyle(.yellow)
+                    }
+                    if let torsion = workspace.measuredTorsion {
+                        LabeledContent("Torsion", value: String(format: "%.3f°", torsion))
                             .foregroundStyle(.yellow)
                     }
                 }
@@ -531,7 +551,7 @@ private struct HelpSheet: View {
                     Label("One-finger drag rotates", systemImage: "hand.draw")
                     Label("Pinch zooms", systemImage: "arrow.up.left.and.arrow.down.right")
                     Label("Two-finger drag pans", systemImage: "hand.point.up.left")
-                    Label("Tap one or two atoms to inspect and measure", systemImage: "ruler")
+                    Label("Tap two, three, or four atoms for distance, angle, or torsion", systemImage: "ruler")
                 }
                 Section("Commands") {
                     command("open 1crn", "Fetch a PDB structure")
@@ -542,11 +562,16 @@ private struct HelpSheet: View {
                     command("surface level 0.8", "Set the map contour")
                     command("hide map", "Hide the density map")
                     command("show atoms", "Show the atomic model")
+                    command("select chain A", "Select every atom in chain A")
+                    command("select residue 42", "Select a residue by number")
+                    command("select element O", "Select atoms by element")
+                    command("select ligand", "Select non-water heteroatoms")
                 }
                 Section("Copilot examples") {
                     command("Download 1CRN and show it as a cartoon", "Fetch and restyle a structure")
                     command("Color every chain differently", "Use plain-language coloring")
                     command("Hide the map and clear my selection", "Perform multiple actions at once")
+                    command("Select chain A", "Select a molecular group using everyday language")
                     Text("Copilot only runs MoleculePad’s supported, allow-listed commands. Switch to Terminal for exact command syntax.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)

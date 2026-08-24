@@ -23,6 +23,7 @@
 		A0000000000000000000010E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000000E /* Assets.xcassets */; };
 		A0000000000000000000010F /* GzipDecompressor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000011 /* GzipDecompressor.swift */; };
 		A00000000000000000000110 /* CopilotInterpreter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000012 /* CopilotInterpreter.swift */; };
+		A00000000000000000000111 /* SelectionAndMeasurements.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000013 /* SelectionAndMeasurements.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -44,6 +45,7 @@
 		A00000000000000000000010 /* MoleculePad.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MoleculePad.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A00000000000000000000011 /* GzipDecompressor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GzipDecompressor.swift; sourceTree = "<group>"; };
 		A00000000000000000000012 /* CopilotInterpreter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CopilotInterpreter.swift; sourceTree = "<group>"; };
+		A00000000000000000000013 /* SelectionAndMeasurements.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectionAndMeasurements.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -91,6 +93,7 @@
 				A0000000000000000000000A /* SampleData.swift */,
 				A00000000000000000000011 /* GzipDecompressor.swift */,
 				A00000000000000000000012 /* CopilotInterpreter.swift */,
+				A00000000000000000000013 /* SelectionAndMeasurements.swift */,
 			);
 			path = Core;
 			sourceTree = "<group>";
@@ -205,6 +208,7 @@
 				A0000000000000000000010D /* MolecularSceneView.swift in Sources */,
 				A0000000000000000000010F /* GzipDecompressor.swift in Sources */,
 				A00000000000000000000110 /* CopilotInterpreter.swift in Sources */,
+				A00000000000000000000111 /* SelectionAndMeasurements.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -323,7 +327,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.medical";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				MARKETING_VERSION = 0.4;
+				MARKETING_VERSION = 0.5;
 				PRODUCT_BUNDLE_IDENTIFIER = com.example.MoleculePad;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -348,7 +352,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.medical";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				MARKETING_VERSION = 0.4;
+				MARKETING_VERSION = 0.5;
 				PRODUCT_BUNDLE_IDENTIFIER = com.example.MoleculePad;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";

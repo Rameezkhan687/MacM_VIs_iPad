@@ -47,7 +47,7 @@ enum MolecularSceneBuilder {
         scene.rootNode.addChildNode(content)
 
         if settings.showAtoms, let structure {
-            addStructure(structure, settings: settings, selection: Set(selection), to: content)
+            addStructure(structure, settings: settings, selection: Set(selection.prefix(2_000)), to: content)
         }
         if settings.showMap, let volume,
            let geometry = IsosurfaceBuilder.geometry(volume: volume, threshold: settings.mapThreshold) {
@@ -63,12 +63,19 @@ enum MolecularSceneBuilder {
             mapNode.name = "density-map"
             content.addChildNode(mapNode)
         }
-        if selection.count == 2, let structure,
-           let first = structure.atoms.first(where: { $0.id == selection[0] }),
-           let second = structure.atoms.first(where: { $0.id == selection[1] }) {
-            let measurement = cylinder(from: first.position, to: second.position, radius: 0.035, color: .systemYellow)
-            measurement.name = "measurement"
-            content.addChildNode(measurement)
+        if (2...4).contains(selection.count), let structure {
+            let atomByID = Dictionary(uniqueKeysWithValues: structure.atoms.map { ($0.id, $0) })
+            let measuredAtoms = selection.compactMap { atomByID[$0] }
+            for pair in zip(measuredAtoms, measuredAtoms.dropFirst()) {
+                let measurement = cylinder(
+                    from: pair.0.position,
+                    to: pair.1.position,
+                    radius: 0.035,
+                    color: .systemYellow
+                )
+                measurement.name = "measurement"
+                content.addChildNode(measurement)
+            }
         }
     }
 

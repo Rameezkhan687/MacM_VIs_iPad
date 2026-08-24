@@ -69,6 +69,10 @@ public struct CopilotInterpreter: Sendable {
             append("show atoms", action: "show the atomic structure", to: &commands, actions: &actions)
         }
 
+        if let selection = selectionCommand(in: text) {
+            append(selection.command, action: selection.action, to: &commands, actions: &actions)
+        }
+
         if containsAny(text, ["clear selection", "clear my selection", "clear the selection", "deselect", "select nothing", "remove selection"]) {
             append("select clear", action: "clear the selection", to: &commands, actions: &actions)
         }
@@ -138,6 +142,53 @@ public struct CopilotInterpreter: Sendable {
         return nil
     }
 
+    private func selectionCommand(in text: String) -> (command: String, action: String)? {
+        guard containsAny(text, ["select", "choose", "highlight"]) else { return nil }
+        if containsAny(text, ["ligand", "ligands"]) {
+            return ("select ligand", "select the ligand atoms")
+        }
+        if containsAny(text, ["water", "waters", "solvent"]) {
+            return ("select water", "select water molecules")
+        }
+        if let chain = firstCapture(
+            pattern: #"(?:select|choose|highlight)(?:\s+(?:all|the))?(?:\s+atoms\s+in)?\s+chain\s+([a-z0-9]+)\b"#,
+            in: text
+        ) {
+            return ("select chain \(chain)", "select chain \(chain.uppercased())")
+        }
+        if let residue = firstCapture(
+            pattern: #"(?:select|choose|highlight)(?:\s+the)?\s+residue\s+(-?[0-9]+)\b"#,
+            in: text
+        ) {
+            return ("select residue \(residue)", "select residue \(residue)")
+        }
+        if let residueName = firstCapture(
+            pattern: #"(?:select|choose|highlight)(?:\s+all)?\s+(?:residue|residues)\s+([a-z]{3})\b"#,
+            in: text
+        ) {
+            return ("select resname \(residueName)", "select \(residueName.uppercased()) residues")
+        }
+
+        let elements = [
+            "hydrogen": "H", "carbon": "C", "nitrogen": "N", "oxygen": "O",
+            "phosphorus": "P", "sulfur": "S", "sulphur": "S", "iron": "FE",
+            "calcium": "CA", "magnesium": "MG", "zinc": "ZN"
+        ]
+        for (name, symbol) in elements where text.contains(name) {
+            return ("select element \(symbol)", "select \(name) atoms")
+        }
+        if let symbol = firstCapture(
+            pattern: #"(?:select|choose|highlight)(?:\s+all)?\s+(?:element\s+)?([a-z]{1,2})(?:\s+atoms?)?\b"#,
+            in: text
+        ), !["my", "the", "all"].contains(symbol) {
+            return ("select element \(symbol)", "select element \(symbol.uppercased())")
+        }
+        if text == "select all" || containsAny(text, ["select all atoms", "select everything", "highlight everything"]) {
+            return ("select all", "select all atoms")
+        }
+        return nil
+    }
+
     private func firstCapture(pattern: String, in text: String) -> String? {
         guard let expression = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else { return nil }
         let range = NSRange(text.startIndex..<text.endIndex, in: text)
@@ -153,7 +204,8 @@ public struct CopilotInterpreter: Sendable {
             #"^color\s+(?:element|chain|residue|mono|monochrome)$"#,
             #"^surface\s+level\s+-?[0-9]+(?:\.[0-9]+)?$"#,
             #"^(?:show|hide)\s+(?:atoms|structure|model|map|surface|volume)$"#,
-            #"^(?:clear|select clear|help)$"#
+            #"^select\s+(?:all|clear|none|ligand|ligands|water|waters|solvent|chain\s+\S+|residue\s+\S+|resname\s+\S+|element\s+\S+|atom\s+\S+)$"#,
+            #"^(?:clear|help)$"#
         ]
         let fullRange = NSRange(text.startIndex..<text.endIndex, in: text)
         for pattern in commandPatterns {

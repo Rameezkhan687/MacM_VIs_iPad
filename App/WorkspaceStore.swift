@@ -34,21 +34,50 @@ final class WorkspaceStore: ObservableObject {
 
     var selectedAtoms: [Atom] {
         guard let structure else { return [] }
-        return selectedAtomIDs.compactMap { id in structure.atoms.first { $0.id == id } }
+        return selectedAtomIDs.compactMap { id in
+            if structure.atoms.indices.contains(id), structure.atoms[id].id == id {
+                return structure.atoms[id]
+            }
+            return structure.atoms.first { $0.id == id }
+        }
     }
 
     var measuredDistance: Float? {
         guard selectedAtoms.count == 2 else { return nil }
-        return (selectedAtoms[0].position - selectedAtoms[1].position).length
+        return MolecularMeasurements.distance(selectedAtoms[0].position, selectedAtoms[1].position)
+    }
+
+    var measuredAngle: Float? {
+        guard selectedAtoms.count == 3 else { return nil }
+        return MolecularMeasurements.angle(
+            selectedAtoms[0].position,
+            selectedAtoms[1].position,
+            selectedAtoms[2].position
+        )
+    }
+
+    var measuredTorsion: Float? {
+        guard selectedAtoms.count == 4 else { return nil }
+        return MolecularMeasurements.torsion(
+            selectedAtoms[0].position,
+            selectedAtoms[1].position,
+            selectedAtoms[2].position,
+            selectedAtoms[3].position
+        )
     }
 
     func selectAtom(_ id: Int, additive: Bool) {
         if additive {
+            if selectedAtomIDs.count > 4 {
+                selectedAtomIDs = [id]
+                sceneRevision += 1
+                return
+            }
             if selectedAtomIDs.contains(id) {
                 selectedAtomIDs.removeAll { $0 == id }
             } else {
                 selectedAtomIDs.append(id)
-                if selectedAtomIDs.count > 2 { selectedAtomIDs.removeFirst() }
+                if selectedAtomIDs.count > 4 { selectedAtomIDs.removeFirst() }
             }
         } else {
             selectedAtomIDs = [id]
@@ -251,10 +280,16 @@ final class WorkspaceStore: ObservableObject {
             setVisibility(parts[1], visible: true)
         case "clear":
             clearSelection()
-        case "select" where parts.dropFirst().first == "clear":
-            clearSelection()
+        case "select" where parts.count >= 2:
+            if parts[1] == "clear" || parts[1] == "none" {
+                clearSelection()
+            } else if let query = selectionQuery(from: parts) {
+                applySelection(query)
+            } else {
+                errorMessage = "Selections: all, chain A, residue 42, resname LYS, element O, atom CA, ligand, water, clear"
+            }
         case "help":
-            statusMessage = "open 1crn · open emd-1001 · style ball|spacefill|sticks|cartoon|backbone · color element|chain|residue|mono · surface level N"
+            statusMessage = "open 1crn · style cartoon · color chain · select chain A|residue 42|element O|ligand|water · surface level N"
         default:
             errorMessage = "Unknown command. Type help for supported commands."
         }
@@ -269,6 +304,49 @@ final class WorkspaceStore: ObservableObject {
             errorMessage = "Choose atoms or map."
             return
         }
+        sceneRevision += 1
+    }
+
+    private func selectionQuery(from parts: [String]) -> MolecularSelectionQuery? {
+        switch parts[1] {
+        case "all", "everything":
+            return .all
+        case "chain" where parts.count == 3:
+            return .chain(parts[2])
+        case "residue" where parts.count == 3,
+             "resid" where parts.count == 3:
+            if let number = Int(parts[2]) { return .residueNumber(number) }
+            return .residueName(parts[2])
+        case "resname" where parts.count == 3:
+            return .residueName(parts[2])
+        case "element" where parts.count == 3:
+            return .element(parts[2])
+        case "atom" where parts.count == 3,
+             "atomname" where parts.count == 3:
+            return .atomName(parts[2])
+        case "ligand", "ligands":
+            return .ligand
+        case "water", "waters", "solvent":
+            return .water
+        default:
+            return nil
+        }
+    }
+
+    private func applySelection(_ query: MolecularSelectionQuery) {
+        guard let structure else {
+            errorMessage = "Open a structure before selecting atoms."
+            return
+        }
+        let atomIDs = MolecularSelectionEngine().atomIDs(in: structure, matching: query)
+        guard !atomIDs.isEmpty else {
+            selectedAtomIDs = []
+            statusMessage = "Selection matched no atoms"
+            sceneRevision += 1
+            return
+        }
+        selectedAtomIDs = atomIDs
+        statusMessage = "Selected \(atomIDs.count) atom\(atomIDs.count == 1 ? "" : "s")"
         sceneRevision += 1
     }
 
