@@ -7,7 +7,8 @@ MoleculePad is a clean-room, touch-first molecular visualization workspace for i
 - Native iPadOS 17 SwiftUI interface with a SceneKit 3D viewport
 - PDB files from the Files app (`.pdb`, `.ent`)
 - Direct PDB downloads from RCSB using four-character IDs
-- MRC/CCP4 density maps (`.mrc`, `.map`, `.ccp4`), including modes 0, 1, 2, and 6
+- Direct primary-map downloads from EMDB using `EMD-` accession IDs
+- MRC/CCP4 density maps (`.mrc`, `.map`, `.ccp4`, and gzip-compressed variants), including modes 0, 1, 2, and 6
 - Interactive density isosurfaces with contour, color, opacity, and wireframe controls
 - Ball-and-stick, spacefill, sticks, and backbone representations
 - Element, chain, residue, and monochrome coloring
@@ -38,4 +39,4 @@ This is a functional foundation, not feature parity with the decades-old desktop
 
 ## Attribution
 
-Protein Data Bank downloads are provided by [RCSB PDB](https://www.rcsb.org/). “UCSF ChimeraX” is associated with the Regents of the University of California; this project is independent and is not endorsed by UCSF.
+Protein Data Bank downloads are provided by [RCSB PDB](https://www.rcsb.org/). Electron-density maps are provided by the [EMDB archive at EMBL-EBI](https://www.ebi.ac.uk/emdb/). “UCSF ChimeraX” is associated with the Regents of the University of California; this project is independent and is not endorsed by UCSF.

@@ -4,7 +4,7 @@ import UniformTypeIdentifiers
 struct ContentView: View {
     @EnvironmentObject private var workspace: WorkspaceStore
     @State private var showImporter = false
-    @State private var showFetchSheet = false
+    @State private var showDatabaseSheet = false
     @State private var showHelp = false
 
     var body: some View {
@@ -30,7 +30,7 @@ struct ContentView: View {
                 }
 
                 if workspace.structure == nil && workspace.volume == nil {
-                    EmptyWorkspaceView(showImporter: $showImporter, showFetchSheet: $showFetchSheet)
+                    EmptyWorkspaceView(showImporter: $showImporter, showDatabaseSheet: $showDatabaseSheet)
                 }
 
                 if workspace.showInspector {
@@ -64,7 +64,7 @@ struct ContentView: View {
             case .failure(let error): workspace.errorMessage = error.localizedDescription
             }
         }
-        .sheet(isPresented: $showFetchSheet) { FetchPDBSheet() }
+        .sheet(isPresented: $showDatabaseSheet) { OpenDatabaseSheet() }
         .sheet(isPresented: $showHelp) { HelpSheet() }
         .alert("MoleculePad", isPresented: Binding(
             get: { workspace.errorMessage != nil },
@@ -82,8 +82,8 @@ struct ContentView: View {
             Button { showImporter = true } label: {
                 Label("Open file", systemImage: "folder.badge.plus")
             }
-            Button { showFetchSheet = true } label: {
-                Label("Fetch PDB", systemImage: "arrow.down.circle")
+            Button { showDatabaseSheet = true } label: {
+                Label("Open database entry", systemImage: "externaldrive.badge.icloud")
             }
             Menu {
                 Picker("Representation", selection: $workspace.settings.representation) {
@@ -109,7 +109,7 @@ struct ContentView: View {
     }
 
     private var supportedTypes: [UTType] {
-        ["pdb", "ent", "mrc", "map", "ccp4"].compactMap { UTType(filenameExtension: $0) } + [.data]
+        ["pdb", "ent", "mrc", "map", "ccp4", "gz"].compactMap { UTType(filenameExtension: $0) } + [.data]
     }
 }
 
@@ -363,7 +363,7 @@ private struct CommandBar: View {
 
 private struct EmptyWorkspaceView: View {
     @Binding var showImporter: Bool
-    @Binding var showFetchSheet: Bool
+    @Binding var showDatabaseSheet: Bool
 
     var body: some View {
         VStack(spacing: 18) {
@@ -371,13 +371,13 @@ private struct EmptyWorkspaceView: View {
                 .font(.system(size: 58, weight: .thin))
                 .foregroundStyle(.cyan)
             Text("Start exploring").font(.largeTitle.bold())
-            Text("Open a structure or density map from Files, or fetch a structure from the Protein Data Bank.")
+            Text("Open a structure or density map from Files, or download an entry from PDB or EMDB.")
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: 420)
             HStack {
                 Button("Open File") { showImporter = true }.buttonStyle(.borderedProminent)
-                Button("Fetch PDB") { showFetchSheet = true }.buttonStyle(.bordered)
+                Button("Open Database") { showDatabaseSheet = true }.buttonStyle(.bordered)
             }
         }
         .padding(36)
@@ -385,36 +385,87 @@ private struct EmptyWorkspaceView: View {
     }
 }
 
-private struct FetchPDBSheet: View {
+private struct OpenDatabaseSheet: View {
     @EnvironmentObject private var workspace: WorkspaceStore
     @Environment(\.dismiss) private var dismiss
+    @State private var source = DatabaseSource.pdb
     @State private var pdbID = ""
+    @State private var emdbID = ""
 
     var body: some View {
         NavigationStack {
             Form {
+                Picker("Database", selection: $source) {
+                    ForEach(DatabaseSource.allCases) { Text($0.title).tag($0) }
+                }
+                .pickerStyle(.segmented)
+
                 Section {
-                    TextField("PDB ID (for example 1CRN)", text: $pdbID)
-                        .textInputAutocapitalization(.characters)
-                        .autocorrectionDisabled()
+                    if source == .pdb {
+                        TextField("PDB ID (for example 1CRN)", text: $pdbID)
+                            .textInputAutocapitalization(.characters)
+                            .autocorrectionDisabled()
+                    } else {
+                        TextField("EMDB ID (for example EMD-1001)", text: $emdbID)
+                            .textInputAutocapitalization(.characters)
+                            .autocorrectionDisabled()
+                            .keyboardType(.asciiCapable)
+                    }
                 } footer: {
-                    Text("Downloads the standard PDB file directly from RCSB.org.")
+                    Text(source.explanation)
+                }
+
+                if source == .emdb {
+                    Section {
+                        Label("EM maps can be large. MoleculePad downsamples them during import to keep touch interaction responsive.", systemImage: "info.circle")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
-            .navigationTitle("Fetch Structure")
+            .navigationTitle("Open Database Entry")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Fetch") {
-                        let id = pdbID
+                    Button("Open") {
+                        let selectedSource = source
+                        let identifier = source == .pdb ? pdbID : emdbID
                         dismiss()
-                        Task { await workspace.fetchPDB(id: id) }
+                        Task {
+                            if selectedSource == .pdb {
+                                await workspace.fetchPDB(id: identifier)
+                            } else {
+                                await workspace.fetchEMDB(id: identifier)
+                            }
+                        }
                     }
-                    .disabled(pdbID.trimmingCharacters(in: .whitespacesAndNewlines).count != 4)
+                    .disabled(!isValidIdentifier)
                 }
             }
         }
         .presentationDetents([.medium])
+    }
+
+    private var isValidIdentifier: Bool {
+        let value = (source == .pdb ? pdbID : emdbID).trimmingCharacters(in: .whitespacesAndNewlines)
+        if source == .pdb { return value.count == 4 }
+        let digits = value.uppercased()
+            .replacingOccurrences(of: "EMD-", with: "")
+            .replacingOccurrences(of: "EMD_", with: "")
+        return (4...6).contains(digits.count) && digits.allSatisfy(\.isNumber)
+    }
+}
+
+private enum DatabaseSource: String, CaseIterable, Identifiable {
+    case pdb
+    case emdb
+
+    var id: Self { self }
+    var title: String { self == .pdb ? "PDB Structure" : "EMDB Map" }
+    var explanation: String {
+        self == .pdb
+            ? "Downloads atomic coordinates directly from RCSB PDB."
+            : "Downloads the primary map directly from the EMBL-EBI EMDB archive."
     }
 }
 
@@ -432,6 +483,7 @@ private struct HelpSheet: View {
                 }
                 Section("Commands") {
                     command("open 1crn", "Fetch a PDB structure")
+                    command("open emd-1001", "Fetch an EMDB density map")
                     command("style spacefill", "Change representation")
                     command("color chain", "Color atoms by chain")
                     command("surface level 0.8", "Set the map contour")
@@ -439,7 +491,7 @@ private struct HelpSheet: View {
                     command("show atoms", "Show the atomic model")
                 }
                 Section("Supported files") {
-                    Text("PDB structures and MRC/CCP4 density maps. Large maps are downsampled on import for interactive performance.")
+                    Text("PDB structures and MRC/CCP4 density maps, including gzip-compressed EMDB maps. Large maps are downsampled on import for interactive performance.")
                 }
             }
             .navigationTitle("MoleculePad Help")

@@ -64,7 +64,7 @@ final class WorkspaceStore: ObservableObject {
         let accessed = url.startAccessingSecurityScopedResource()
         defer { if accessed { url.stopAccessingSecurityScopedResource() } }
         do {
-            let data = try Data(contentsOf: url, options: .mappedIfSafe)
+            var data = try Data(contentsOf: url, options: .mappedIfSafe)
             let ext = url.pathExtension.lowercased()
             if ["pdb", "ent"].contains(ext) {
                 structure = try PDBParser().parse(data, name: url.deletingPathExtension().lastPathComponent)
@@ -73,6 +73,15 @@ final class WorkspaceStore: ObservableObject {
             } else if ["mrc", "map", "ccp4"].contains(ext) {
                 volume = try MRCParser().parse(data, name: url.deletingPathExtension().lastPathComponent)
                 settings.mapThreshold = volume?.suggestedContour ?? 0
+                settings.showMap = true
+                statusMessage = "Opened \(url.lastPathComponent) — \(volumeDescription)"
+            } else if ext == "gz", isCompressedMap(url) {
+                statusMessage = "Decompressing \(url.lastPathComponent)…"
+                data = try GzipDecompressor().decompress(data)
+                let mapName = url.deletingPathExtension().deletingPathExtension().lastPathComponent
+                volume = try MRCParser().parse(data, name: mapName)
+                settings.mapThreshold = volume?.suggestedContour ?? 0
+                settings.showMap = true
                 statusMessage = "Opened \(url.lastPathComponent) — \(volumeDescription)"
             } else {
                 throw MolecularError.unsupportedFile(url.pathExtension)
@@ -108,6 +117,42 @@ final class WorkspaceStore: ObservableObject {
         }
     }
 
+    func fetchEMDB(id rawID: String) async {
+        let digits = normalizedEMDBID(rawID)
+        guard (4...6).contains(digits.count), digits.allSatisfy(\.isNumber) else {
+            errorMessage = "Enter an EMDB ID such as EMD-1001 or 1001."
+            return
+        }
+        guard let url = URL(
+            string: "https://ftp.ebi.ac.uk/pub/databases/emdb/structures/EMD-\(digits)/map/emd_\(digits).map.gz"
+        ) else { return }
+
+        isLoading = true
+        statusMessage = "Downloading EMD-\(digits)…"
+        defer { isLoading = false }
+        do {
+            let request = URLRequest(url: url, timeoutInterval: 300)
+            let (compressedData, response) = try await URLSession.shared.data(for: request)
+            guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+                throw MolecularError.network("EMDB did not return EMD-\(digits).")
+            }
+
+            statusMessage = "Decompressing and reading EMD-\(digits)…"
+            let loadedVolume = try await Task.detached(priority: .userInitiated) {
+                let mapData = try GzipDecompressor().decompress(compressedData)
+                return try MRCParser().parse(mapData, name: "EMD-\(digits)")
+            }.value
+            volume = loadedVolume
+            settings.mapThreshold = volume?.suggestedContour ?? 0
+            settings.showMap = true
+            statusMessage = "Opened EMD-\(digits) — \(volumeDescription)"
+            sceneRevision += 1
+        } catch {
+            errorMessage = error.localizedDescription
+            statusMessage = "EMDB download failed"
+        }
+    }
+
     func closeStructure() {
         structure = nil
         selectedAtomIDs = []
@@ -134,7 +179,12 @@ final class WorkspaceStore: ObservableObject {
         guard let verb = parts.first else { return }
         switch verb {
         case "open" where parts.count == 2, "fetch" where parts.count == 2:
-            Task { await fetchPDB(id: parts[1]) }
+            let identifier = parts[1]
+            if identifier.hasPrefix("emd-") || identifier.hasPrefix("emd_") {
+                Task { await fetchEMDB(id: identifier) }
+            } else {
+                Task { await fetchPDB(id: identifier) }
+            }
         case "style" where parts.count >= 2:
             let value = parts.dropFirst().joined(separator: "")
             let mapping: [String: MolecularRepresentation] = [
@@ -167,10 +217,12 @@ final class WorkspaceStore: ObservableObject {
             setVisibility(parts[1], visible: false)
         case "show" where parts.count == 2:
             setVisibility(parts[1], visible: true)
-        case "clear", "select" where parts.dropFirst().first == "clear":
+        case "clear":
+            clearSelection()
+        case "select" where parts.dropFirst().first == "clear":
             clearSelection()
         case "help":
-            statusMessage = "open 1crn · style ball|spacefill|sticks|backbone · color element|chain|residue|mono · surface level N · show/hide atoms|map"
+            statusMessage = "open 1crn · open emd-1001 · style ball|spacefill|sticks|backbone · color element|chain|residue|mono · surface level N"
         default:
             errorMessage = "Unknown command. Type help for supported commands."
         }
@@ -191,5 +243,18 @@ final class WorkspaceStore: ObservableObject {
     private var volumeDescription: String {
         guard let d = volume?.dimensions else { return "0 voxels" }
         return "\(d.x) × \(d.y) × \(d.z) voxels"
+    }
+
+    private func normalizedEMDBID(_ rawID: String) -> String {
+        rawID
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .uppercased()
+            .replacingOccurrences(of: "EMD-", with: "")
+            .replacingOccurrences(of: "EMD_", with: "")
+    }
+
+    private func isCompressedMap(_ url: URL) -> Bool {
+        let lowercasedName = url.lastPathComponent.lowercased()
+        return [".map.gz", ".mrc.gz", ".ccp4.gz"].contains { lowercasedName.hasSuffix($0) }
     }
 }

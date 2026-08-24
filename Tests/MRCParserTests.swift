@@ -3,6 +3,16 @@ import Testing
 @testable import MoleculePadCore
 
 struct MRCParserTests {
+    @Test func decompressesGzipData() throws {
+        let compressed = Data([
+            0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03,
+            0xcb, 0x48, 0xcd, 0xc9, 0xc9, 0x07, 0x00,
+            0x86, 0xa6, 0x10, 0x36, 0x05, 0x00, 0x00, 0x00
+        ])
+        let decompressed = try GzipDecompressor().decompress(compressed)
+        #expect(String(data: decompressed, encoding: .utf8) == "hello")
+    }
+
     @Test func parsesFloatMap() throws {
         var data = Data(repeating: 0, count: 1024 + 8 * 4)
         writeInt32(2, at: 0, to: &data)

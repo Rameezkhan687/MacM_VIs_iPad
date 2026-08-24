@@ -21,6 +21,7 @@
 		A0000000000000000000010C /* MolecularSceneBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000000C /* MolecularSceneBuilder.swift */; };
 		A0000000000000000000010D /* MolecularSceneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000000D /* MolecularSceneView.swift */; };
 		A0000000000000000000010E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000000E /* Assets.xcassets */; };
+		A0000000000000000000010F /* GzipDecompressor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000011 /* GzipDecompressor.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -40,6 +41,7 @@
 		A0000000000000000000000E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A0000000000000000000000F /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		A00000000000000000000010 /* MoleculePad.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MoleculePad.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A00000000000000000000011 /* GzipDecompressor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GzipDecompressor.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -85,6 +87,7 @@
 				A00000000000000000000008 /* BondInference.swift */,
 				A00000000000000000000009 /* MRCParser.swift */,
 				A0000000000000000000000A /* SampleData.swift */,
+				A00000000000000000000011 /* GzipDecompressor.swift */,
 			);
 			path = Core;
 			sourceTree = "<group>";
@@ -197,6 +200,7 @@
 				A0000000000000000000010B /* IsosurfaceBuilder.swift in Sources */,
 				A0000000000000000000010C /* MolecularSceneBuilder.swift in Sources */,
 				A0000000000000000000010D /* MolecularSceneView.swift in Sources */,
+				A0000000000000000000010F /* GzipDecompressor.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -256,7 +260,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.medical";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				MARKETING_VERSION = 0.1;
+				MARKETING_VERSION = 0.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.example.MoleculePad;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -281,7 +285,7 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.medical";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				MARKETING_VERSION = 0.1;
+				MARKETING_VERSION = 0.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.example.MoleculePad;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
