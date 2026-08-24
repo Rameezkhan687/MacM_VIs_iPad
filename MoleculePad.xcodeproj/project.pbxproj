@@ -24,6 +24,27 @@
 		A0000000000000000000010F /* GzipDecompressor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000011 /* GzipDecompressor.swift */; };
 		A00000000000000000000110 /* CopilotInterpreter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000012 /* CopilotInterpreter.swift */; };
 		A00000000000000000000111 /* SelectionAndMeasurements.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000013 /* SelectionAndMeasurements.swift */; };
+		A00000000000000000000112 /* MMCIFParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000014 /* MMCIFParser.swift */; };
+		A00000000000000000000113 /* MolecularSurfaceGridBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000015 /* MolecularSurfaceGridBuilder.swift */; };
+		A00000000000000000000114 /* BiologicalAssemblyBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000016 /* BiologicalAssemblyBuilder.swift */; };
+		A00000000000000000000115 /* SmallMoleculeParsers.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000017 /* SmallMoleculeParsers.swift */; };
+		A00000000000000000000116 /* MolecularAnalysis.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000018 /* MolecularAnalysis.swift */; };
+		A00000000000000000000117 /* VolumeProcessing.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000019 /* VolumeProcessing.swift */; };
+		A00000000000000000000118 /* MedicalImageParsers.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000001A /* MedicalImageParsers.swift */; };
+		A00000000000000000000119 /* MolecularEditing.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000001B /* MolecularEditing.swift */; };
+		A0000000000000000000011A /* SessionCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000001C /* SessionCodec.swift */; };
+		A0000000000000000000011B /* SessionFileDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000001D /* SessionFileDocument.swift */; };
+		A0000000000000000000011C /* DCDParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000001E /* DCDParser.swift */; };
+		A0000000000000000000011D /* PluginSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000001F /* PluginSystem.swift */; };
+		A0000000000000000000011E /* CopilotBackendClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000020 /* CopilotBackendClient.swift */; };
+		A0000000000000000000011F /* ExportDocuments.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000021 /* ExportDocuments.swift */; };
+		A00000000000000000000120 /* SceneExportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000022 /* SceneExportService.swift */; };
+		A00000000000000000000121 /* Annotations.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000023 /* Annotations.swift */; };
+		A00000000000000000000122 /* ComparativeModeling.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000024 /* ComparativeModeling.swift */; };
+		A00000000000000000000123 /* RCSBSearchClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000025 /* RCSBSearchClient.swift */; };
+		A00000000000000000000124 /* StructureFileWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000026 /* StructureFileWriter.swift */; };
+		A00000000000000000000125 /* ComputeProviderClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000027 /* ComputeProviderClient.swift */; };
+		A00000000000000000000126 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000028 /* KeychainStore.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -46,6 +67,27 @@
 		A00000000000000000000011 /* GzipDecompressor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GzipDecompressor.swift; sourceTree = "<group>"; };
 		A00000000000000000000012 /* CopilotInterpreter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CopilotInterpreter.swift; sourceTree = "<group>"; };
 		A00000000000000000000013 /* SelectionAndMeasurements.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SelectionAndMeasurements.swift; sourceTree = "<group>"; };
+		A00000000000000000000014 /* MMCIFParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MMCIFParser.swift; sourceTree = "<group>"; };
+		A00000000000000000000015 /* MolecularSurfaceGridBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MolecularSurfaceGridBuilder.swift; sourceTree = "<group>"; };
+		A00000000000000000000016 /* BiologicalAssemblyBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BiologicalAssemblyBuilder.swift; sourceTree = "<group>"; };
+		A00000000000000000000017 /* SmallMoleculeParsers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmallMoleculeParsers.swift; sourceTree = "<group>"; };
+		A00000000000000000000018 /* MolecularAnalysis.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MolecularAnalysis.swift; sourceTree = "<group>"; };
+		A00000000000000000000019 /* VolumeProcessing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VolumeProcessing.swift; sourceTree = "<group>"; };
+		A0000000000000000000001A /* MedicalImageParsers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MedicalImageParsers.swift; sourceTree = "<group>"; };
+		A0000000000000000000001B /* MolecularEditing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MolecularEditing.swift; sourceTree = "<group>"; };
+		A0000000000000000000001C /* SessionCodec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionCodec.swift; sourceTree = "<group>"; };
+		A0000000000000000000001D /* SessionFileDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionFileDocument.swift; sourceTree = "<group>"; };
+		A0000000000000000000001E /* DCDParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DCDParser.swift; sourceTree = "<group>"; };
+		A0000000000000000000001F /* PluginSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PluginSystem.swift; sourceTree = "<group>"; };
+		A00000000000000000000020 /* CopilotBackendClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CopilotBackendClient.swift; sourceTree = "<group>"; };
+		A00000000000000000000021 /* ExportDocuments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportDocuments.swift; sourceTree = "<group>"; };
+		A00000000000000000000022 /* SceneExportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneExportService.swift; sourceTree = "<group>"; };
+		A00000000000000000000023 /* Annotations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Annotations.swift; sourceTree = "<group>"; };
+		A00000000000000000000024 /* ComparativeModeling.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComparativeModeling.swift; sourceTree = "<group>"; };
+		A00000000000000000000025 /* RCSBSearchClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RCSBSearchClient.swift; sourceTree = "<group>"; };
+		A00000000000000000000026 /* StructureFileWriter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StructureFileWriter.swift; sourceTree = "<group>"; };
+		A00000000000000000000027 /* ComputeProviderClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComputeProviderClient.swift; sourceTree = "<group>"; };
+		A00000000000000000000028 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -78,6 +120,10 @@
 				A00000000000000000000002 /* ContentView.swift */,
 				A00000000000000000000003 /* RenderSettings.swift */,
 				A00000000000000000000004 /* WorkspaceStore.swift */,
+				A0000000000000000000001D /* SessionFileDocument.swift */,
+				A00000000000000000000021 /* ExportDocuments.swift */,
+				A00000000000000000000022 /* SceneExportService.swift */,
+				A00000000000000000000028 /* KeychainStore.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -94,6 +140,23 @@
 				A00000000000000000000011 /* GzipDecompressor.swift */,
 				A00000000000000000000012 /* CopilotInterpreter.swift */,
 				A00000000000000000000013 /* SelectionAndMeasurements.swift */,
+				A00000000000000000000014 /* MMCIFParser.swift */,
+				A00000000000000000000015 /* MolecularSurfaceGridBuilder.swift */,
+				A00000000000000000000016 /* BiologicalAssemblyBuilder.swift */,
+				A00000000000000000000017 /* SmallMoleculeParsers.swift */,
+				A00000000000000000000018 /* MolecularAnalysis.swift */,
+				A00000000000000000000019 /* VolumeProcessing.swift */,
+				A0000000000000000000001A /* MedicalImageParsers.swift */,
+				A0000000000000000000001B /* MolecularEditing.swift */,
+				A0000000000000000000001C /* SessionCodec.swift */,
+				A0000000000000000000001E /* DCDParser.swift */,
+				A0000000000000000000001F /* PluginSystem.swift */,
+				A00000000000000000000020 /* CopilotBackendClient.swift */,
+				A00000000000000000000023 /* Annotations.swift */,
+				A00000000000000000000024 /* ComparativeModeling.swift */,
+				A00000000000000000000025 /* RCSBSearchClient.swift */,
+				A00000000000000000000026 /* StructureFileWriter.swift */,
+				A00000000000000000000027 /* ComputeProviderClient.swift */,
 			);
 			path = Core;
 			sourceTree = "<group>";
@@ -209,6 +272,27 @@
 				A0000000000000000000010F /* GzipDecompressor.swift in Sources */,
 				A00000000000000000000110 /* CopilotInterpreter.swift in Sources */,
 				A00000000000000000000111 /* SelectionAndMeasurements.swift in Sources */,
+				A00000000000000000000112 /* MMCIFParser.swift in Sources */,
+				A00000000000000000000113 /* MolecularSurfaceGridBuilder.swift in Sources */,
+				A00000000000000000000114 /* BiologicalAssemblyBuilder.swift in Sources */,
+				A00000000000000000000115 /* SmallMoleculeParsers.swift in Sources */,
+				A00000000000000000000116 /* MolecularAnalysis.swift in Sources */,
+				A00000000000000000000117 /* VolumeProcessing.swift in Sources */,
+				A00000000000000000000118 /* MedicalImageParsers.swift in Sources */,
+				A00000000000000000000119 /* MolecularEditing.swift in Sources */,
+				A0000000000000000000011A /* SessionCodec.swift in Sources */,
+				A0000000000000000000011B /* SessionFileDocument.swift in Sources */,
+				A0000000000000000000011C /* DCDParser.swift in Sources */,
+				A0000000000000000000011D /* PluginSystem.swift in Sources */,
+				A0000000000000000000011E /* CopilotBackendClient.swift in Sources */,
+				A0000000000000000000011F /* ExportDocuments.swift in Sources */,
+				A00000000000000000000120 /* SceneExportService.swift in Sources */,
+				A00000000000000000000121 /* Annotations.swift in Sources */,
+				A00000000000000000000122 /* ComparativeModeling.swift in Sources */,
+				A00000000000000000000123 /* RCSBSearchClient.swift in Sources */,
+				A00000000000000000000124 /* StructureFileWriter.swift in Sources */,
+				A00000000000000000000125 /* ComputeProviderClient.swift in Sources */,
+				A00000000000000000000126 /* KeychainStore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -327,7 +411,8 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.medical";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				MARKETING_VERSION = 0.5;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.example.MoleculePad;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -352,7 +437,8 @@
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.medical";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				MARKETING_VERSION = 0.5;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.example.MoleculePad;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";

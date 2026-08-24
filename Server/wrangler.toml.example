@@ -1,0 +1,10 @@
+name = "moleculepad-copilot"
+main = "copilot-worker.js"
+compatibility_date = "2026-08-01"
+
+[vars]
+OPENAI_MODEL = "gpt-5.6-luna"
+
+# Set both secrets with the deployment platform rather than placing them here:
+# OPENAI_API_KEY
+# MOLECULEPAD_ACCESS_TOKEN

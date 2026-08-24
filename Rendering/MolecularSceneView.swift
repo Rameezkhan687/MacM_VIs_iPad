@@ -6,6 +6,9 @@ struct MolecularSceneView: UIViewRepresentable {
     let volume: VolumeMap?
     let settings: RenderSettings
     let selectedAtomIDs: [Int]
+    let interactions: [MolecularInteraction]
+    let cavities: [MolecularCavity]
+    let customPseudobonds: [CustomPseudobond]
     let revision: Int
     let onSelectAtom: (Int) -> Void
 
@@ -47,15 +50,24 @@ struct MolecularSceneView: UIViewRepresentable {
                 structure: structure,
                 volume: volume,
                 settings: settings,
-                selection: selectedAtomIDs
+                selection: selectedAtomIDs,
+                interactions: interactions,
+                cavities: cavities,
+                customPseudobonds: customPseudobonds
             )
-            if requiresFit {
-                MolecularSceneBuilder.fitCamera(scene: scene, structure: structure, volume: volume)
+            if requiresFit || context.coordinator.viewDirection != settings.viewDirection {
+                MolecularSceneBuilder.fitCamera(
+                    scene: scene,
+                    structure: structure,
+                    volume: volume,
+                    direction: settings.viewDirection
+                )
                 view.pointOfView = scene.rootNode.childNode(withName: "camera", recursively: false)
             }
             context.coordinator.revision = revision
             context.coordinator.settings = settings
             context.coordinator.contentID = contentID
+            context.coordinator.viewDirection = settings.viewDirection
         }
     }
 
@@ -65,6 +77,7 @@ struct MolecularSceneView: UIViewRepresentable {
         var revision = -1
         var settings: RenderSettings?
         var contentID = ""
+        var viewDirection: ViewDirection?
 
         init(onSelectAtom: @escaping (Int) -> Void) {
             self.onSelectAtom = onSelectAtom

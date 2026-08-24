@@ -4,6 +4,62 @@ import simd
 
 @MainActor
 enum MolecularSceneBuilder {
+    private struct SpatialCell: Hashable {
+        let x: Int
+        let y: Int
+        let z: Int
+    }
+    private struct SurfaceCacheKey: Hashable {
+        let structureID: UUID
+        let atomCount: Int
+        let probeHundredths: Int
+        let style: MolecularSurfaceStyle
+    }
+
+    private static var molecularSurfaceCache: [SurfaceCacheKey: SCNGeometry] = [:]
+
+    static func exportScene(
+        structure: MolecularStructure?,
+        volume: VolumeMap?,
+        settings: RenderSettings,
+        selection: [Int],
+        interactions: [MolecularInteraction],
+        cavities: [MolecularCavity],
+        customPseudobonds: [CustomPseudobond] = []
+    ) -> SCNScene {
+        let scene = SCNScene()
+        configureScene(scene)
+        rebuild(
+            scene: scene, structure: structure, volume: volume, settings: settings,
+            selection: selection, interactions: interactions, cavities: cavities,
+            customPseudobonds: customPseudobonds
+        )
+        fitCamera(scene: scene, structure: structure, volume: volume, direction: settings.viewDirection)
+        scene.background.contents = UIColor(settings.backgroundColor)
+        return scene
+    }
+
+    static func snapshot(
+        structure: MolecularStructure?,
+        volume: VolumeMap?,
+        settings: RenderSettings,
+        selection: [Int],
+        interactions: [MolecularInteraction],
+        cavities: [MolecularCavity],
+        customPseudobonds: [CustomPseudobond] = [],
+        size: CGSize = CGSize(width: 2048, height: 2048)
+    ) -> UIImage {
+        let scene = exportScene(
+            structure: structure, volume: volume, settings: settings,
+            selection: selection, interactions: interactions, cavities: cavities,
+            customPseudobonds: customPseudobonds
+        )
+        let renderer = SCNRenderer(device: nil, options: nil)
+        renderer.scene = scene
+        renderer.pointOfView = scene.rootNode.childNode(withName: "camera", recursively: false)
+        return renderer.snapshot(atTime: 0, with: size, antialiasingMode: .multisampling4X)
+    }
+
     static func configureScene(_ scene: SCNScene) {
         let camera = SCNCamera()
         camera.fieldOfView = 42
@@ -21,6 +77,7 @@ enum MolecularSceneBuilder {
         key.intensity = 1_150
         key.castsShadow = false
         let keyNode = SCNNode()
+        keyNode.name = "key-light"
         keyNode.eulerAngles = SCNVector3(-0.7, 0.8, 0)
         keyNode.light = key
         scene.rootNode.addChildNode(keyNode)
@@ -30,6 +87,7 @@ enum MolecularSceneBuilder {
         fill.intensity = 430
         fill.color = UIColor(white: 0.72, alpha: 1)
         let fillNode = SCNNode()
+        fillNode.name = "fill-light"
         fillNode.light = fill
         scene.rootNode.addChildNode(fillNode)
     }
@@ -39,18 +97,65 @@ enum MolecularSceneBuilder {
         structure: MolecularStructure?,
         volume: VolumeMap?,
         settings: RenderSettings,
-        selection: [Int]
+        selection: [Int],
+        interactions: [MolecularInteraction] = [],
+        cavities: [MolecularCavity] = [],
+        customPseudobonds: [CustomPseudobond] = []
     ) {
         scene.rootNode.childNode(withName: "content", recursively: false)?.removeFromParentNode()
         let content = SCNNode()
         content.name = "content"
         scene.rootNode.addChildNode(content)
+        updateEnvironment(scene: scene, settings: settings)
 
         if settings.showAtoms, let structure {
             addStructure(structure, settings: settings, selection: Set(selection.prefix(2_000)), to: content)
         }
-        if settings.showMap, let volume,
-           let geometry = IsosurfaceBuilder.geometry(volume: volume, threshold: settings.mapThreshold) {
+        if settings.showMolecularSurface, let structure,
+           let baseGeometry = molecularSurfaceGeometry(
+               for: structure,
+               probeRadius: settings.molecularSurfaceProbeRadius,
+               style: settings.molecularSurfaceStyle
+           ) {
+            let geometry = settings.molecularSurfaceColorMode == .uniform
+                ? baseGeometry
+                : propertyColoredSurface(baseGeometry, structure: structure, mode: settings.molecularSurfaceColorMode)
+            let material = SCNMaterial()
+            material.diffuse.contents = settings.molecularSurfaceColorMode == .uniform
+                ? UIColor(settings.molecularSurfaceColor)
+                : UIColor.white
+            material.emission.contents = UIColor(settings.molecularSurfaceColor).withAlphaComponent(0.04)
+            material.transparency = settings.molecularSurfaceOpacity
+            material.isDoubleSided = true
+            material.lightingModel = .physicallyBased
+            material.roughness.contents = 0.44
+            material.metalness.contents = 0.02
+            material.fillMode = settings.molecularSurfaceStyle == .mesh ? .lines : .fill
+            if settings.molecularSurfaceStyle == .dots {
+                material.lightingModel = .constant
+                material.writesToDepthBuffer = true
+                material.readsFromDepthBuffer = true
+            }
+            geometry.materials = [material]
+            let surfaceNode = SCNNode(geometry: geometry)
+            surfaceNode.name = "molecular-surface"
+            content.addChildNode(surfaceNode)
+        }
+        if settings.showMap, let volume {
+            let geometry: SCNGeometry?
+            switch settings.volumeDisplayStyle {
+            case .surface:
+                geometry = IsosurfaceBuilder.geometry(volume: volume, threshold: settings.mapThreshold)
+            case .volume:
+                geometry = volumePointGeometry(volume, threshold: settings.mapThreshold, slices: nil)
+            case .slices:
+                geometry = volumePointGeometry(
+                    volume,
+                    threshold: settings.mapThreshold,
+                    slices: (settings.sliceX, settings.sliceY, settings.sliceZ)
+                )
+            }
+            if let geometry {
             let material = SCNMaterial()
             material.diffuse.contents = UIColor(settings.mapColor)
             material.emission.contents = UIColor(settings.mapColor).withAlphaComponent(0.06)
@@ -58,10 +163,19 @@ enum MolecularSceneBuilder {
             material.isDoubleSided = true
             material.lightingModel = .physicallyBased
             material.fillMode = settings.mapWireframe ? .lines : .fill
+            if settings.volumeDisplayStyle != .surface {
+                material.lightingModel = .constant
+                geometry.elements.forEach {
+                    $0.pointSize = settings.volumeDisplayStyle == .slices ? 4 : 3
+                    $0.minimumPointScreenSpaceRadius = 1
+                    $0.maximumPointScreenSpaceRadius = 6
+                }
+            }
             geometry.materials = [material]
             let mapNode = SCNNode(geometry: geometry)
             mapNode.name = "density-map"
             content.addChildNode(mapNode)
+            }
         }
         if (2...4).contains(selection.count), let structure {
             let atomByID = Dictionary(uniqueKeysWithValues: structure.atoms.map { ($0.id, $0) })
@@ -76,10 +190,273 @@ enum MolecularSceneBuilder {
                 measurement.name = "measurement"
                 content.addChildNode(measurement)
             }
+            if settings.showSelectionArrow, measuredAtoms.count >= 2 {
+                content.addChildNode(arrow(
+                    from: measuredAtoms[0].position,
+                    to: measuredAtoms[1].position,
+                    color: .systemOrange
+                ))
+            }
+        }
+        if let structure, !interactions.isEmpty {
+            let atomByID = Dictionary(uniqueKeysWithValues: structure.atoms.map { ($0.id, $0) })
+            for interaction in interactions.prefix(12_000) {
+                guard let first = atomByID[interaction.atom1], let second = atomByID[interaction.atom2] else { continue }
+                let color: UIColor = switch interaction.kind {
+                case .hydrogenBond: .systemCyan
+                case .contact: .systemGreen
+                case .clash: .systemRed
+                }
+                let node = cylinder(from: first.position, to: second.position, radius: 0.025, color: color)
+                node.name = "pseudobond:\(interaction.kind.rawValue)"
+                content.addChildNode(node)
+            }
+        }
+        if let structure, !customPseudobonds.isEmpty {
+            let atomByID = Dictionary(uniqueKeysWithValues: structure.atoms.map { ($0.id, $0) })
+            for bond in customPseudobonds.prefix(12_000) {
+                guard let first = atomByID[bond.atom1], let second = atomByID[bond.atom2] else { continue }
+                let components = bond.color
+                let color = components.count >= 4
+                    ? UIColor(
+                        red: CGFloat(components[0]), green: CGFloat(components[1]),
+                        blue: CGFloat(components[2]), alpha: CGFloat(components[3])
+                    )
+                    : UIColor.systemOrange
+                let node = cylinder(from: first.position, to: second.position, radius: 0.035, color: color)
+                node.name = "custom-pseudobond:\(bond.group)"
+                content.addChildNode(node)
+            }
+        }
+        for cavity in cavities.prefix(100) {
+            let radius = max(0.35, min(4, pow(3 * cavity.volume / (4 * Float.pi), 1 / 3)))
+            let sphere = SCNSphere(radius: CGFloat(radius))
+            sphere.segmentCount = 16
+            let material = SCNMaterial()
+            material.diffuse.contents = UIColor.systemOrange.withAlphaComponent(0.14)
+            material.emission.contents = UIColor.systemOrange.withAlphaComponent(0.12)
+            material.fillMode = .lines
+            material.isDoubleSided = true
+            sphere.materials = [material]
+            let node = SCNNode(geometry: sphere)
+            node.name = "cavity:\(cavity.id)"
+            node.position = SCNVector3(cavity.center.x, cavity.center.y, cavity.center.z)
+            content.addChildNode(node)
+        }
+        if let structure {
+            addLabels(structure, settings: settings, selection: Set(selection), to: content)
+            if settings.showAxes { addAxes(center: structure.center, radius: structure.radius, to: content) }
+            if settings.showScaleBar { addScaleBar(structure: structure, labelColor: UIColor(settings.labelColor), to: content) }
         }
     }
 
-    static func fitCamera(scene: SCNScene, structure: MolecularStructure?, volume: VolumeMap?) {
+    private static func molecularSurfaceGeometry(
+        for structure: MolecularStructure,
+        probeRadius: Float,
+        style: MolecularSurfaceStyle
+    ) -> SCNGeometry? {
+        let key = SurfaceCacheKey(
+            structureID: structure.id,
+            atomCount: structure.atoms.count,
+            probeHundredths: Int((probeRadius * 100).rounded()),
+            style: style
+        )
+        if let cached = molecularSurfaceCache[key] { return cached }
+        let geometry: SCNGeometry?
+        if style == .dots {
+            geometry = molecularSurfaceDotGeometry(for: structure, probeRadius: probeRadius)
+        } else if let grid = MolecularSurfaceGridBuilder().build(
+            structure: structure,
+            probeRadius: probeRadius
+        ) {
+            geometry = IsosurfaceBuilder.geometry(volume: grid, threshold: 0)
+        } else {
+            geometry = nil
+        }
+        guard let geometry else { return nil }
+
+        if molecularSurfaceCache.count >= 4 {
+            molecularSurfaceCache.removeValue(forKey: molecularSurfaceCache.keys.first!)
+        }
+        molecularSurfaceCache[key] = geometry
+        return geometry
+    }
+
+    private static func propertyColoredSurface(
+        _ geometry: SCNGeometry,
+        structure: MolecularStructure,
+        mode: MolecularSurfaceColorMode
+    ) -> SCNGeometry {
+        guard let vertexSource = geometry.sources(for: .vertex).first,
+              vertexSource.usesFloatComponents,
+              vertexSource.componentsPerVector >= 3,
+              vertexSource.bytesPerComponent == 4 else { return geometry }
+        let atoms = structure.atoms
+        guard !atoms.isEmpty else { return geometry }
+        let bValues = atoms.map(\.bFactor)
+        let bMinimum = bValues.min() ?? 0
+        let bRange = max(0.001, (bValues.max() ?? 1) - bMinimum)
+        let cellSize: Float = 5
+        func cell(for position: Vector3) -> SpatialCell {
+            SpatialCell(
+                x: Int(floor(position.x / cellSize)),
+                y: Int(floor(position.y / cellSize)),
+                z: Int(floor(position.z / cellSize))
+            )
+        }
+        var buckets: [SpatialCell: [Atom]] = [:]
+        for atom in atoms { buckets[cell(for: atom.position), default: []].append(atom) }
+        var colors: [SIMD4<Float>] = []
+        colors.reserveCapacity(vertexSource.vectorCount)
+        for index in 0..<vertexSource.vectorCount {
+            let offset = vertexSource.dataOffset + index * vertexSource.dataStride
+            let position = vertexSource.data.withUnsafeBytes { raw -> Vector3 in
+                Vector3(
+                    x: raw.loadUnaligned(fromByteOffset: offset, as: Float.self),
+                    y: raw.loadUnaligned(fromByteOffset: offset + 4, as: Float.self),
+                    z: raw.loadUnaligned(fromByteOffset: offset + 8, as: Float.self)
+                )
+            }
+            let origin = cell(for: position)
+            var candidates: [Atom] = []
+            for z in (origin.z - 1)...(origin.z + 1) {
+                for y in (origin.y - 1)...(origin.y + 1) {
+                    for x in (origin.x - 1)...(origin.x + 1) {
+                        candidates.append(contentsOf: buckets[SpatialCell(x: x, y: y, z: z)] ?? [])
+                    }
+                }
+            }
+            let atom = candidates.min {
+                ($0.position - position).length < ($1.position - position).length
+            } ?? atoms[0]
+            let color: UIColor
+            switch mode {
+            case .uniform:
+                color = .white
+            case .element:
+                color = self.color(for: atom, mode: .element)
+            case .chain:
+                color = self.color(for: atom, mode: .chain)
+            case .residue:
+                color = self.color(for: atom, mode: .residue)
+            case .bFactor:
+                let value = CGFloat((atom.bFactor - bMinimum) / bRange)
+                color = UIColor(red: value, green: 0.25, blue: 1 - value, alpha: 1)
+            case .charge:
+                let value = CGFloat(min(1, max(-1, atom.partialCharge)))
+                color = value >= 0
+                    ? UIColor(red: 1, green: 1 - value * 0.8, blue: 1 - value * 0.8, alpha: 1)
+                    : UIColor(red: 1 + value * 0.8, green: 1 + value * 0.8, blue: 1, alpha: 1)
+            }
+            var red: CGFloat = 1, green: CGFloat = 1, blue: CGFloat = 1, alpha: CGFloat = 1
+            color.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+            colors.append(SIMD4(Float(red), Float(green), Float(blue), Float(alpha)))
+        }
+        let colorData = colors.withUnsafeBytes { Data($0) }
+        let colorSource = SCNGeometrySource(
+            data: colorData, semantic: .color, vectorCount: colors.count,
+            usesFloatComponents: true, componentsPerVector: 4, bytesPerComponent: 4,
+            dataOffset: 0, dataStride: MemoryLayout<SIMD4<Float>>.stride
+        )
+        let sources = geometry.sources.filter { $0.semantic != .color } + [colorSource]
+        return SCNGeometry(sources: sources, elements: geometry.elements)
+    }
+
+    private static func molecularSurfaceDotGeometry(for structure: MolecularStructure, probeRadius: Float) -> SCNGeometry? {
+        let directions: [Vector3] = [
+            Vector3(x: 1, y: 0, z: 0), Vector3(x: -1, y: 0, z: 0),
+            Vector3(x: 0, y: 1, z: 0), Vector3(x: 0, y: -1, z: 0),
+            Vector3(x: 0, y: 0, z: 1), Vector3(x: 0, y: 0, z: -1),
+            Vector3(x: 0.577, y: 0.577, z: 0.577), Vector3(x: -0.577, y: 0.577, z: 0.577),
+            Vector3(x: 0.577, y: -0.577, z: 0.577), Vector3(x: 0.577, y: 0.577, z: -0.577),
+            Vector3(x: -0.577, y: -0.577, z: 0.577), Vector3(x: -0.577, y: 0.577, z: -0.577),
+            Vector3(x: 0.577, y: -0.577, z: -0.577), Vector3(x: -0.577, y: -0.577, z: -0.577)
+        ]
+        var points: [SCNVector3] = []
+        for atom in structure.atoms.prefix(8_000) {
+            let radius = ElementTable.vanDerWaalsRadius(for: atom.element) + probeRadius
+            for direction in directions {
+                points.append(SCNVector3(
+                    atom.position.x + direction.x * radius,
+                    atom.position.y + direction.y * radius,
+                    atom.position.z + direction.z * radius
+                ))
+            }
+        }
+        guard !points.isEmpty else { return nil }
+        let indices = (0..<points.count).map(UInt32.init)
+        let element = SCNGeometryElement(indices: indices, primitiveType: .point)
+        element.pointSize = 3
+        element.minimumPointScreenSpaceRadius = 1
+        element.maximumPointScreenSpaceRadius = 5
+        return SCNGeometry(
+            sources: [SCNGeometrySource(vertices: points)],
+            elements: [element]
+        )
+    }
+
+    private static func volumePointGeometry(
+        _ volume: VolumeMap,
+        threshold: Float,
+        slices: (Double, Double, Double)?
+    ) -> SCNGeometry? {
+        let d = volume.dimensions
+        let sliceIndices = slices.map {
+            (
+                x: min(d.x - 1, max(0, Int((Double(d.x - 1) * $0.0).rounded()))),
+                y: min(d.y - 1, max(0, Int((Double(d.y - 1) * $0.1).rounded()))),
+                z: min(d.z - 1, max(0, Int((Double(d.z - 1) * $0.2).rounded())))
+            )
+        }
+        let strideValue = max(1, Int(ceil(pow(Double(max(1, volume.values.count)) / 90_000, 1.0 / 3.0))))
+        var points: [SCNVector3] = []
+        for z in Swift.stride(from: 0, to: d.z, by: strideValue) {
+            for y in Swift.stride(from: 0, to: d.y, by: strideValue) {
+                for x in Swift.stride(from: 0, to: d.x, by: strideValue) {
+                    if let sliceIndices,
+                       abs(x - sliceIndices.x) >= strideValue,
+                       abs(y - sliceIndices.y) >= strideValue,
+                       abs(z - sliceIndices.z) >= strideValue { continue }
+                    guard volume.value(x: x, y: y, z: z) >= threshold else { continue }
+                    points.append(SCNVector3(
+                        volume.origin.x + Float(x) * volume.spacing.x,
+                        volume.origin.y + Float(y) * volume.spacing.y,
+                        volume.origin.z + Float(z) * volume.spacing.z
+                    ))
+                }
+            }
+        }
+        guard !points.isEmpty else { return nil }
+        let indices = (0..<points.count).map(UInt32.init)
+        let element = SCNGeometryElement(indices: indices, primitiveType: .point)
+        return SCNGeometry(sources: [SCNGeometrySource(vertices: points)], elements: [element])
+    }
+
+    private static func updateEnvironment(scene: SCNScene, settings: RenderSettings) {
+        let key = scene.rootNode.childNode(withName: "key-light", recursively: false)?.light
+        let fill = scene.rootNode.childNode(withName: "fill-light", recursively: false)?.light
+        switch settings.lightingPreset {
+        case .studio:
+            key?.intensity = 1_150; fill?.intensity = 430
+        case .soft:
+            key?.intensity = 760; fill?.intensity = 680
+        case .flat:
+            key?.intensity = 250; fill?.intensity = 900
+        case .dramatic:
+            key?.intensity = 1_750; fill?.intensity = 140
+        }
+        if let camera = scene.rootNode.childNode(withName: "camera", recursively: false)?.camera {
+            camera.zNear = max(0.001, settings.nearClip)
+            camera.zFar = max(camera.zNear + 1, settings.farClip)
+        }
+    }
+
+    static func fitCamera(
+        scene: SCNScene,
+        structure: MolecularStructure?,
+        volume: VolumeMap?,
+        direction: ViewDirection = .front
+    ) {
         guard let cameraNode = scene.rootNode.childNode(withName: "camera", recursively: false) else { return }
         var center = structure?.center ?? .zero
         var radius = structure?.radius ?? 5
@@ -95,10 +472,82 @@ enum MolecularSceneBuilder {
                 Float(volume.dimensions.z) * volume.spacing.z
             ) / 2
         }
-        cameraNode.position = SCNVector3(center.x, center.y, center.z + max(8, radius * 3.1))
+        let distance = max(8, radius * 3.1)
+        switch direction {
+        case .front: cameraNode.position = SCNVector3(center.x, center.y, center.z + distance)
+        case .back: cameraNode.position = SCNVector3(center.x, center.y, center.z - distance)
+        case .left: cameraNode.position = SCNVector3(center.x - distance, center.y, center.z)
+        case .right: cameraNode.position = SCNVector3(center.x + distance, center.y, center.z)
+        case .top: cameraNode.position = SCNVector3(center.x, center.y + distance, center.z)
+        case .bottom: cameraNode.position = SCNVector3(center.x, center.y - distance, center.z)
+        }
         cameraNode.look(at: SCNVector3(center.x, center.y, center.z))
-        cameraNode.camera?.zNear = Double(max(0.01, radius * 0.01))
-        cameraNode.camera?.zFar = Double(max(1_000, radius * 20))
+    }
+
+    private static func addLabels(
+        _ structure: MolecularStructure,
+        settings: RenderSettings,
+        selection: Set<Int>,
+        to parent: SCNNode
+    ) {
+        let entries: [(String, Vector3)]
+        switch settings.labelStyle {
+        case .none:
+            return
+        case .selected:
+            entries = structure.atoms.filter { selection.contains($0.id) }.prefix(150).map {
+                ("\($0.name)  \($0.residueName) \($0.residueNumber)", $0.position)
+            }
+        case .atoms:
+            entries = structure.atoms.prefix(300).map { ($0.name, $0.position) }
+        case .residues:
+            var seen = Set<String>()
+            entries = structure.atoms.compactMap { atom in
+                let key = "\(atom.chainID):\(atom.residueNumber)"
+                guard (atom.name.uppercased() == "CA" || atom.name.uppercased() == "P"), seen.insert(key).inserted else { return nil }
+                return ("\(atom.residueName) \(atom.residueNumber)", atom.position)
+            }.prefix(300).map { $0 }
+        case .chains:
+            var seen = Set<String>()
+            entries = structure.atoms.compactMap { atom in
+                guard seen.insert(atom.chainID).inserted else { return nil }
+                return (atom.chainID.isEmpty ? "Chain —" : "Chain \(atom.chainID)", atom.position)
+            }.prefix(100).map { $0 }
+        }
+        for entry in entries {
+            parent.addChildNode(textNode(entry.0, at: entry.1, color: UIColor(settings.labelColor), scale: 0.018))
+        }
+    }
+
+    private static func textNode(_ text: String, at position: Vector3, color: UIColor, scale: Float) -> SCNNode {
+        let geometry = SCNText(string: text, extrusionDepth: 0.05)
+        geometry.font = UIFont.systemFont(ofSize: 11, weight: .semibold)
+        geometry.flatness = 0.2
+        let material = SCNMaterial()
+        material.diffuse.contents = color
+        material.emission.contents = color.withAlphaComponent(0.22)
+        material.isDoubleSided = true
+        geometry.materials = [material]
+        let node = SCNNode(geometry: geometry)
+        node.position = SCNVector3(position.x + 0.18, position.y + 0.18, position.z)
+        node.scale = SCNVector3(scale, scale, scale)
+        node.constraints = [SCNBillboardConstraint()]
+        return node
+    }
+
+    private static func addAxes(center: Vector3, radius: Float, to parent: SCNNode) {
+        let length = max(2, min(8, radius * 0.35))
+        parent.addChildNode(cylinder(from: center, to: center + Vector3(x: length, y: 0, z: 0), radius: 0.055, color: .systemRed))
+        parent.addChildNode(cylinder(from: center, to: center + Vector3(x: 0, y: length, z: 0), radius: 0.055, color: .systemGreen))
+        parent.addChildNode(cylinder(from: center, to: center + Vector3(x: 0, y: 0, z: length), radius: 0.055, color: .systemBlue))
+    }
+
+    private static func addScaleBar(structure: MolecularStructure, labelColor: UIColor, to parent: SCNNode) {
+        let length: Float = structure.radius > 35 ? 20 : (structure.radius > 12 ? 10 : 5)
+        let start = structure.center + Vector3(x: -structure.radius * 0.75, y: -structure.radius * 0.85, z: 0)
+        let end = start + Vector3(x: length, y: 0, z: 0)
+        parent.addChildNode(cylinder(from: start, to: end, radius: 0.065, color: labelColor))
+        parent.addChildNode(textNode("\(Int(length)) Å", at: end, color: labelColor, scale: 0.02))
     }
 
     private static func addStructure(
@@ -109,6 +558,25 @@ enum MolecularSceneBuilder {
     ) {
         if settings.representation == .cartoon {
             addCartoon(structure, settings: settings, selection: selection, to: parent)
+            return
+        }
+        if settings.representation == .nucleotides || settings.representation == .glycans {
+            let nucleotideNames = Set(["A", "C", "G", "U", "T", "DA", "DC", "DG", "DT", "DU", "ADE", "CYT", "GUA", "URI", "THY"])
+            let glycanNames = Set(["NAG", "NDG", "BMA", "MAN", "FUC", "GAL", "GLC", "SIA", "NAN", "FUL", "XYS", "BGC"])
+            let allowed = settings.representation == .nucleotides ? nucleotideNames : glycanNames
+            let filteredAtoms = structure.atoms.filter { allowed.contains($0.residueName.uppercased()) }
+            let visible = Set(filteredAtoms.map(\.id))
+            guard !filteredAtoms.isEmpty else { return }
+            var specializedSettings = settings
+            specializedSettings.representation = settings.representation == .nucleotides ? .backbone : .ballAndStick
+            let filtered = MolecularStructure(
+                id: structure.id,
+                name: structure.name,
+                atoms: filteredAtoms,
+                bonds: structure.bonds.filter { visible.contains($0.atom1) && visible.contains($0.atom2) },
+                secondaryStructure: structure.secondaryStructure
+            )
+            addStructure(filtered, settings: specializedSettings, selection: selection, to: parent)
             return
         }
 
@@ -152,6 +620,8 @@ enum MolecularSceneBuilder {
             case .cartoon: radius = 0.22
             case .backbone: radius = 0.22
             case .ballAndStick: radius = CGFloat(ElementTable.covalentRadius(for: atom.element)) * 0.48
+            case .thermal: radius = max(0.16, CGFloat(ElementTable.covalentRadius(for: atom.element)) * 0.36)
+            case .nucleotides, .glycans: radius = 0.2
             }
             let sphere = SCNSphere(radius: radius * CGFloat(settings.atomScale))
             sphere.segmentCount = structure.atoms.count > 8_000 ? 8 : 16
@@ -164,6 +634,10 @@ enum MolecularSceneBuilder {
             let node = SCNNode(geometry: sphere)
             node.name = "atom:\(atom.id)"
             node.position = SCNVector3(atom.position.x, atom.position.y, atom.position.z)
+            if settings.representation == .thermal {
+                let thermalScale = max(0.55, min(2.4, sqrt(max(0.01, atom.bFactor) / 20)))
+                node.scale = SCNVector3(thermalScale * 1.18, thermalScale * 0.88, thermalScale)
+            }
             parent.addChildNode(node)
 
             if selection.contains(atom.id) {
@@ -488,6 +962,35 @@ enum MolecularSceneBuilder {
             node.simdOrientation = simd_quatf(from: SIMD3<Float>(0, 1, 0), to: delta / length)
         }
         return node
+    }
+
+    private static func arrow(from a: Vector3, to b: Vector3, color: UIColor) -> SCNNode {
+        let parent = SCNNode()
+        let start = SIMD3<Float>(a.x, a.y, a.z)
+        let end = SIMD3<Float>(b.x, b.y, b.z)
+        let delta = end - start
+        let length = simd_length(delta)
+        guard length > 0.25 else { return parent }
+        let direction = delta / length
+        let headLength = min(0.8, length * 0.28)
+        let shaftEnd = end - direction * headLength
+        parent.addChildNode(cylinder(
+            from: a,
+            to: vector3(shaftEnd),
+            radius: 0.08,
+            color: color
+        ))
+        let cone = SCNCone(topRadius: 0, bottomRadius: 0.22, height: CGFloat(headLength))
+        cone.radialSegmentCount = 16
+        let material = SCNMaterial()
+        material.diffuse.contents = color
+        material.lightingModel = .physicallyBased
+        cone.materials = [material]
+        let node = SCNNode(geometry: cone)
+        node.simdPosition = (shaftEnd + end) / 2
+        node.simdOrientation = simd_quatf(from: SIMD3<Float>(0, 1, 0), to: direction)
+        parent.addChildNode(node)
+        return parent
     }
 
     private static func color(for atom: Atom, mode: AtomColorMode) -> UIColor {

@@ -1,50 +1,55 @@
 # MoleculePad
 
-MoleculePad is a clean-room, touch-first molecular visualization workspace for iPad. It is inspired by established desktop molecular-graphics workflows but does not contain UCSF ChimeraX source code, artwork, or branding.
+MoleculePad is a clean-room, touch-first molecular visualization and analysis workspace for iPadOS 17. It recreates the major scientific workflows cataloged in the public UCSF ChimeraX User Guide with original Swift/SceneKit code; it does not contain ChimeraX source code, artwork, branding, or proprietary modules.
 
-## Working in this first build
+## Included in version 1.0
 
-- Native iPadOS 17 SwiftUI interface with a SceneKit 3D viewport
-- PDB files from the Files app (`.pdb`, `.ent`)
-- Direct PDB downloads from RCSB using four-character IDs
-- Direct primary-map downloads from EMDB using `EMD-` accession IDs
-- MRC/CCP4 density maps (`.mrc`, `.map`, `.ccp4`, and gzip-compressed variants), including modes 0, 1, 2, and 6
-- Interactive density isosurfaces with contour, color, opacity, and wireframe controls
-- Ball-and-stick, spacefill, sticks, backbone, and cartoon representations
-- Cartoon helices, beta-sheet arrows, and smooth coil traces from PDB secondary-structure records
-- Element, chain, residue, and monochrome coloring
-- Touch rotation, pan, zoom, atom picking, and two-atom distance measurements
-- Group selection by chain, residue number/name, element, atom name, ligand, water, or the full model
-- Distance, three-atom angle, and four-atom torsion measurements
-- A plain-language Copilot that translates multi-step requests into safe, allow-listed commands
-- A compact expert terminal (`help` lists the implemented commands)
-- Pure-Swift tests for PDB parsing, bond inference, and MRC parsing
+- PDB, mmCIF, SDF/MOL, MOL2, XYZ, DCD, MRC/CCP4, NIfTI, NRRD, DICOM, gzip map, command-script, plug-in-manifest, and MoleculePad session files
+- Direct RCSB PDB, EMDB, and AlphaFold DB import; NCBI protein BLAST and official RCSB 3D-similarity search
+- Biological assemblies, alternate locations, multiple coordinate sets, trajectory playback, and DCD trajectories using an open topology
+- Ball-and-stick, sticks, spacefill, backbone, cartoon, nucleotide, glycan, and B-factor ellipsoid rendering
+- Solvent-accessible surfaces in solid, mesh, and dot modes, including per-vertex element, chain, residue, B-factor, and charge coloring
+- Isosurfaces, volume clouds, orthogonal slices, map filtering, crop/zone/difference operations, segmentation, and translational or rotational fitting
+- Selection, measurements, labels, lighting, clipping, saved views/scenes, 3D arrows, custom pseudobonds, and Apple Pencil/touch 2D annotations
+- Hydrogen bonds, contacts, clashes, cavities, interfaces, molecular geometry, sequence alignment/conservation, RMSD, and structural superposition
+- Atom/bond editing, mutation, hydrogen/charge preparation, Dock Prep, minimization, torsion/rotamer editing, tugging, docking-pose analysis, loop building, and reference-template completion
+- Undo/redo, versioned sessions, scripts, aliases, custom buttons, safe declarative plug-ins, multi-file batch processing, task history, and presentation mode
+- PNG, MP4 trajectory, PDB coordinate, versioned session, and SceneKit 3D-scene export
+- On-device plain-language Copilot plus an optional secure server Copilot; Foldseek, ESMFold, OpenFold, and Boltz use a configurable HTTPS compute provider
 
-Copilot examples include “Download 1CRN and show it as a cartoon,” “Color every chain differently,” and “Hide the map and clear my selection.” This first layer works locally without an account. A future open-ended AI provider must be routed through a secure backend; API keys must never be embedded in the iPad app or committed to this public repository.
+Copilot is the top-level interface. A request such as “download 1CRN, show a chain-colored cartoon, find hydrogen bonds, and start presentation mode” becomes a visible sequence of allow-listed MoleculePad commands. Terminal and touch controls call the same operations.
 
-The staged ChimeraX-capability roadmap is tracked in [`FEATURE_PARITY.md`](FEATURE_PARITY.md). Copilot, Terminal, and touch interfaces share the same underlying operations so new modules automatically become available to each interface.
+## Privacy and security
+
+MoleculePad asks only for files explicitly selected with Apple’s document picker. It does not request access to Photos, Music, or Videos. Local structures, maps, sessions, and annotations stay on the device unless the user exports or sends them to a configured service.
+
+Optional service URLs are stored in app preferences. Their access tokens are stored in the iPad Keychain. OpenAI or compute-provider keys belong on the server and must never be embedded in the app or committed to this public repository. The optional worker in [`Server/`](Server/) validates commands server-side; the iPad validates them again before execution.
 
 ## Run on an iPad
 
-1. Install the current Xcode from the Mac App Store.
-2. Open `MoleculePad.xcodeproj`.
-3. Select the MoleculePad target, open **Signing & Capabilities**, and choose your Apple Developer team.
-4. Connect the iPad by USB or enable wireless debugging, select it as the run destination, and press Run.
+1. Install the current Xcode on a Mac and open `MoleculePad.xcodeproj`.
+2. Select the MoleculePad target, open **Signing & Capabilities**, and choose your Apple Developer team.
+3. Connect the iPad by USB or enable wireless debugging, select it as the run destination, and press Run.
 
-A free Apple ID can install a development build on your own iPad. TestFlight or App Store distribution requires enrollment in the Apple Developer Program.
+A free Apple ID can install a development build on your own iPad. TestFlight or App Store distribution requires Apple Developer Program enrollment.
 
-## Test the file-format engine
-
-From this directory, run:
+## Validate
 
 ```sh
 swift test
+xcodebuild -project MoleculePad.xcodeproj -scheme MoleculePad -sdk iphoneos -configuration Debug CODE_SIGNING_ALLOWED=NO build
 ```
 
-## Scope and roadmap
+The core suite covers file formats, assemblies, surfaces, selections, analysis, map processing/fitting, editing/modeling, sessions, plug-ins, and backend validation. See [`FEATURE_PARITY.md`](FEATURE_PARITY.md) for the audit and [`Docs/EXTENSION_PROTOCOLS.md`](Docs/EXTENSION_PROTOCOLS.md) for server and plug-in contracts.
 
-This is a functional foundation, not feature parity with the decades-old desktop ChimeraX codebase. High-value next layers are mmCIF, segmented map regions, molecular surfaces, symmetry, fitting, session files, image/movie export, DICOM, and an extensible analysis-command engine. A literal ChimeraX port or redistributed derivative requires prior written permission from UCSF under its published license.
+## Deliberate boundaries
+
+- DCD is the included binary trajectory reader; proprietary or heavily compressed MD formats such as XTC require a separately licensed decoder.
+- DICOM metadata and uncompressed pixel data are supported. JPEG/JPEG-LS/JPEG 2000/RLE and deflated transfer syntaxes are detected and rejected with a clear conversion message because no licensed medical codec is bundled.
+- Foldseek and prediction models require user-selected compute infrastructure. The public repository contains the typed client protocol but no third-party credentials or paid GPU service.
+- Presentation and portable session handoff work on iPad. Real-time multi-user synchronization and immersive spatial/VR rendering require separate cloud, SharePlay, or visionOS entitlements and are not falsely represented as local iPad features.
+- Molecular modeling and minimization are interactive approximations for exploration, not replacements for validated force-field, clinical, or production modeling pipelines.
 
 ## Attribution
 
-Protein Data Bank downloads are provided by [RCSB PDB](https://www.rcsb.org/). Electron-density maps are provided by the [EMDB archive at EMBL-EBI](https://www.ebi.ac.uk/emdb/). “UCSF ChimeraX” is associated with the Regents of the University of California; this project is independent and is not endorsed by UCSF.
+Data downloads are provided by [RCSB PDB](https://www.rcsb.org/), [EMDB at EMBL-EBI](https://www.ebi.ac.uk/emdb/), [AlphaFold DB](https://alphafold.ebi.ac.uk/), and [NCBI BLAST](https://blast.ncbi.nlm.nih.gov/). “UCSF ChimeraX” is associated with the Regents of the University of California. MoleculePad is independent and is not endorsed by UCSF.

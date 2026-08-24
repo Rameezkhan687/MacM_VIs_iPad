@@ -11,16 +11,80 @@ public struct PDBParser: Sendable {
     }
 
     public func parse(_ text: String, name: String = "Structure") throws -> MolecularStructure {
+        guard let first = try parseTrajectory(text, name: name).frames.first else {
+            throw MolecularError.invalidPDB("No coordinate models were found.")
+        }
+        return first
+    }
+
+    public func parseTrajectory(_ data: Data, name: String = "Trajectory") throws -> MolecularTrajectory {
+        guard let text = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .ascii) else {
+            throw MolecularError.invalidPDB("The file is not readable text.")
+        }
+        return try parseTrajectory(text, name: name)
+    }
+
+    public func parseTrajectory(_ text: String, name: String = "Trajectory") throws -> MolecularTrajectory {
+        let lines = text.split(whereSeparator: \.isNewline).map(String.init)
+        let containsModels = lines.contains { field($0, 0, 6).trimmingCharacters(in: .whitespaces) == "MODEL" }
+        let sharedID = UUID()
+        guard containsModels else {
+            return MolecularTrajectory(name: name, frames: [try parseModel(text, name: name, id: sharedID)])
+        }
+
+        let annotationRecords = lines.filter {
+            let record = field($0, 0, 6).trimmingCharacters(in: .whitespaces)
+            return record == "HELIX" || record == "SHEET"
+        }
+        let connectionRecords = lines.filter {
+            field($0, 0, 6).trimmingCharacters(in: .whitespaces) == "CONECT"
+        }
+        var blocks: [[String]] = []
+        var current: [String] = []
+        var insideModel = false
+        for line in lines {
+            let record = field(line, 0, 6).trimmingCharacters(in: .whitespaces)
+            if record == "MODEL" {
+                if insideModel, !current.isEmpty { blocks.append(current) }
+                current = []
+                insideModel = true
+            } else if record == "ENDMDL" {
+                if insideModel, !current.isEmpty { blocks.append(current) }
+                current = []
+                insideModel = false
+            } else if insideModel && (record == "ATOM" || record == "HETATM") {
+                current.append(line)
+            }
+        }
+        if !current.isEmpty { blocks.append(current) }
+
+        let frames = try blocks.enumerated().map { index, block in
+            try parseModel(
+                (annotationRecords + block + connectionRecords).joined(separator: "\n"),
+                name: "\(name) · Frame \(index + 1)",
+                id: sharedID
+            )
+        }
+        guard let expected = frames.first?.atoms.count,
+              expected > 0,
+              frames.allSatisfy({ $0.atoms.count == expected }) else {
+            throw MolecularError.invalidPDB("Coordinate models contain different atom counts.")
+        }
+        return MolecularTrajectory(name: name, frames: frames)
+    }
+
+    private func parseModel(_ text: String, name: String, id: UUID) throws -> MolecularStructure {
         var atoms: [Atom] = []
         var serialToID: [Int: Int] = [:]
         var explicitBonds = Set<Bond>()
         var secondaryStructure: [SecondaryStructureSegment] = []
+        var atomIndexByIdentity: [String: Int] = [:]
+        var alternatePositions: [String: [Int: Vector3]] = [:]
 
         for line in text.split(whereSeparator: \.isNewline).map(String.init) {
             let record = field(line, 0, 6).trimmingCharacters(in: .whitespaces)
             if record == "ATOM" || record == "HETATM" {
                 let alternateLocation = field(line, 16, 17).trimmingCharacters(in: .whitespaces)
-                guard alternateLocation.isEmpty || alternateLocation == "A" else { continue }
                 guard
                     let serial = Int(field(line, 6, 11).trimmingCharacters(in: .whitespaces)),
                     let x = Float(field(line, 30, 38).trimmingCharacters(in: .whitespaces)),
@@ -30,6 +94,18 @@ public struct PDBParser: Sendable {
 
                 let atomName = field(line, 12, 16).trimmingCharacters(in: .whitespaces)
                 let rawElement = field(line, 76, 78).trimmingCharacters(in: .whitespaces)
+                let chainID = field(line, 21, 22).trimmingCharacters(in: .whitespaces)
+                let residueNumber = Int(field(line, 22, 26).trimmingCharacters(in: .whitespaces)) ?? 0
+                let identity = "\(chainID)|\(residueNumber)|\(atomName)"
+                let position = Vector3(x: x, y: y, z: z)
+                if let atomID = atomIndexByIdentity[identity] {
+                    serialToID[serial] = atomID
+                    if !alternateLocation.isEmpty {
+                        alternatePositions[alternateLocation, default: [:]][atomID] = position
+                        if alternateLocation == "A" { atoms[atomID].position = position }
+                    }
+                    continue
+                }
                 let id = atoms.count
                 atoms.append(Atom(
                     id: id,
@@ -37,14 +113,18 @@ public struct PDBParser: Sendable {
                     name: atomName,
                     element: rawElement.isEmpty ? ElementTable.inferredElement(atomName: atomName) : rawElement,
                     residueName: field(line, 17, 20).trimmingCharacters(in: .whitespaces),
-                    residueNumber: Int(field(line, 22, 26).trimmingCharacters(in: .whitespaces)) ?? 0,
-                    chainID: field(line, 21, 22).trimmingCharacters(in: .whitespaces),
-                    position: Vector3(x: x, y: y, z: z),
+                    residueNumber: residueNumber,
+                    chainID: chainID,
+                    position: position,
                     occupancy: Float(field(line, 54, 60).trimmingCharacters(in: .whitespaces)) ?? 1,
                     bFactor: Float(field(line, 60, 66).trimmingCharacters(in: .whitespaces)) ?? 0,
                     isHetero: record == "HETATM"
                 ))
                 serialToID[serial] = id
+                atomIndexByIdentity[identity] = id
+                if !alternateLocation.isEmpty {
+                    alternatePositions[alternateLocation, default: [:]][id] = position
+                }
             } else if record == "CONECT" {
                 let values = stride(from: 6, to: line.count, by: 5).compactMap {
                     Int(field(line, $0, min($0 + 5, line.count)).trimmingCharacters(in: .whitespaces))
@@ -82,12 +162,16 @@ public struct PDBParser: Sendable {
 
         let bonds = explicitBonds.isEmpty ? BondInference.infer(atoms: atoms) : Array(explicitBonds)
         return MolecularStructure(
+            id: id,
             name: name,
             atoms: atoms,
             bonds: bonds.sorted {
                 $0.atom1 == $1.atom1 ? $0.atom2 < $1.atom2 : $0.atom1 < $1.atom1
             },
-            secondaryStructure: secondaryStructure
+            secondaryStructure: secondaryStructure,
+            alternateConformations: alternatePositions.keys.sorted().map {
+                AlternateConformation(id: $0, positions: alternatePositions[$0] ?? [:])
+            }
         )
     }
 

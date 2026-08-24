@@ -3,6 +3,8 @@
 DerivedData/
 .derivedData/
 .deviceDerivedData/
+.deviceBuildValidation/
+.finalDerivedData/
 .typecheckCache/
 .swiftpm-cache/
 .swiftpm-module-cache/

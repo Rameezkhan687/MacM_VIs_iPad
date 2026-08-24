@@ -43,4 +43,21 @@ struct PDBParserTests {
         #expect(structure.secondaryStructureKind(chainID: "A", residueNumber: 90) == .helix)
         #expect(structure.secondaryStructureKind(chainID: "A", residueNumber: 105) == .coil)
     }
+
+    @Test func parsesMultiModelTrajectory() throws {
+        let trajectoryPDB = """
+        MODEL        1
+        \(SampleData.miniProteinPDB)
+        ENDMDL
+        MODEL        2
+        \(SampleData.miniProteinPDB)
+        ENDMDL
+        """
+        let trajectory = try PDBParser().parseTrajectory(trajectoryPDB, name: "Motion")
+
+        #expect(trajectory.frameCount == 2)
+        #expect(trajectory.frames[0].atoms.count == 20)
+        #expect(trajectory.frames[0].id == trajectory.frames[1].id)
+        #expect(trajectory.frames[1].name.contains("Frame 2"))
+    }
 }
