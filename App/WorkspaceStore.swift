@@ -2,6 +2,13 @@ import Foundation
 import SwiftUI
 import UniformTypeIdentifiers
 
+enum CommandInputMode: String, CaseIterable, Identifiable {
+    case copilot = "Copilot"
+    case terminal = "Terminal"
+
+    var id: Self { self }
+}
+
 @MainActor
 final class WorkspaceStore: ObservableObject {
     @Published var structure: MolecularStructure?
@@ -13,6 +20,8 @@ final class WorkspaceStore: ObservableObject {
     @Published var errorMessage: String?
     @Published var commandText = ""
     @Published var commandHistory: [String] = []
+    @Published var commandInputMode: CommandInputMode = .copilot
+    @Published var copilotPlan: CopilotPlan?
     @Published var showInspector = true
     @Published var sceneRevision = 0
 
@@ -171,7 +180,29 @@ final class WorkspaceStore: ObservableObject {
         guard !command.isEmpty else { return }
         commandHistory.append(command)
         commandText = ""
-        execute(command)
+        if commandInputMode == .copilot {
+            executeCopilotRequest(command)
+        } else {
+            copilotPlan = nil
+            execute(command)
+        }
+    }
+
+    func dismissCopilotPlan() {
+        copilotPlan = nil
+    }
+
+    private func executeCopilotRequest(_ request: String) {
+        let plan = CopilotInterpreter().plan(request)
+        copilotPlan = plan
+        guard plan.isActionable else {
+            statusMessage = "Copilot needs a supported viewing request"
+            return
+        }
+        for command in plan.commands {
+            execute(command)
+        }
+        statusMessage = plan.summary
     }
 
     func execute(_ command: String) {

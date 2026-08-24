@@ -14,8 +14,11 @@ MoleculePad is a clean-room, touch-first molecular visualization workspace for i
 - Cartoon helices, beta-sheet arrows, and smooth coil traces from PDB secondary-structure records
 - Element, chain, residue, and monochrome coloring
 - Touch rotation, pan, zoom, atom picking, and two-atom distance measurements
-- A compact command bar (`help` lists the implemented commands)
+- A plain-language Copilot that translates multi-step requests into safe, allow-listed commands
+- A compact expert terminal (`help` lists the implemented commands)
 - Pure-Swift tests for PDB parsing, bond inference, and MRC parsing
+
+Copilot examples include “Download 1CRN and show it as a cartoon,” “Color every chain differently,” and “Hide the map and clear my selection.” This first layer works locally without an account. A future open-ended AI provider must be routed through a secure backend; API keys must never be embedded in the iPad app or committed to this public repository.
 
 ## Run on an iPad
 

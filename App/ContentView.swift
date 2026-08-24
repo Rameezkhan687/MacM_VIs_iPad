@@ -341,21 +341,73 @@ private struct CommandBar: View {
     @Binding var showHelp: Bool
 
     var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "chevron.right.2").foregroundStyle(.cyan)
-            TextField("Command — try: open 1crn", text: $workspace.commandText)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .onSubmit(workspace.executeCommand)
-            Button(action: workspace.executeCommand) {
-                Image(systemName: "return")
+        VStack(spacing: 0) {
+            if let plan = workspace.copilotPlan {
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: "sparkles")
+                        .foregroundStyle(.cyan)
+                        .padding(.top, 2)
+                    VStack(alignment: .leading, spacing: 7) {
+                        Text(plan.summary)
+                            .font(.callout)
+                        if plan.isActionable {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 6) {
+                                    ForEach(plan.commands, id: \.self) { command in
+                                        Text(command)
+                                            .font(.system(.caption, design: .monospaced))
+                                            .foregroundStyle(.cyan)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 4)
+                                            .background(.cyan.opacity(0.12), in: Capsule())
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Spacer(minLength: 8)
+                    Button(action: workspace.dismissCopilotPlan) {
+                        Image(systemName: "xmark")
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(.regularMaterial)
+                .overlay(alignment: .top) { Divider() }
             }
-            .disabled(workspace.commandText.trimmingCharacters(in: .whitespaces).isEmpty)
-            Button { showHelp = true } label: { Image(systemName: "questionmark.circle") }
+
+            HStack(spacing: 10) {
+                Picker("Input mode", selection: $workspace.commandInputMode) {
+                    ForEach(CommandInputMode.allCases) { mode in
+                        Label(mode.rawValue, systemImage: mode == .copilot ? "sparkles" : "terminal")
+                            .tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 180)
+
+                TextField(
+                    workspace.commandInputMode == .copilot
+                        ? "Ask in plain language — try: show 1CRN as a cartoon"
+                        : "Command — try: open 1crn",
+                    text: $workspace.commandText
+                )
+                .font(workspace.commandInputMode == .terminal ? .system(.body, design: .monospaced) : .body)
+                .textInputAutocapitalization(workspace.commandInputMode == .copilot ? .sentences : .never)
+                .autocorrectionDisabled(workspace.commandInputMode == .terminal)
+                .onSubmit(workspace.executeCommand)
+
+                Button(action: workspace.executeCommand) {
+                    Image(systemName: workspace.commandInputMode == .copilot ? "arrow.up.circle.fill" : "return")
+                }
+                .disabled(workspace.commandText.trimmingCharacters(in: .whitespaces).isEmpty)
+                Button { showHelp = true } label: { Image(systemName: "questionmark.circle") }
+            }
+            .padding(.horizontal, 14)
+            .frame(height: 54)
         }
-        .font(.system(.body, design: .monospaced))
-        .padding(.horizontal, 14)
-        .frame(height: 50)
         .background(.ultraThinMaterial)
         .overlay(alignment: .top) { Divider() }
     }
@@ -490,6 +542,14 @@ private struct HelpSheet: View {
                     command("surface level 0.8", "Set the map contour")
                     command("hide map", "Hide the density map")
                     command("show atoms", "Show the atomic model")
+                }
+                Section("Copilot examples") {
+                    command("Download 1CRN and show it as a cartoon", "Fetch and restyle a structure")
+                    command("Color every chain differently", "Use plain-language coloring")
+                    command("Hide the map and clear my selection", "Perform multiple actions at once")
+                    Text("Copilot only runs MoleculePad’s supported, allow-listed commands. Switch to Terminal for exact command syntax.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
                 Section("Supported files") {
                     Text("PDB structures and MRC/CCP4 density maps, including gzip-compressed EMDB maps. Large maps are downsampled on import for interactive performance.")
