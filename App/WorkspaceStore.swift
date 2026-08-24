@@ -190,13 +190,14 @@ final class WorkspaceStore: ObservableObject {
             let mapping: [String: MolecularRepresentation] = [
                 "ball": .ballAndStick, "ball&stick": .ballAndStick, "ballandstick": .ballAndStick,
                 "spacefill": .spacefill, "spheres": .spacefill,
-                "sticks": .sticks, "backbone": .backbone
+                "sticks": .sticks, "cartoon": .cartoon, "ribbon": .cartoon,
+                "backbone": .backbone
             ]
             if let representation = mapping[value] {
                 settings.representation = representation
                 sceneRevision += 1
                 statusMessage = "Style: \(representation.rawValue)"
-            } else { errorMessage = "Styles: ball, spacefill, sticks, backbone" }
+            } else { errorMessage = "Styles: ball, spacefill, sticks, cartoon, backbone" }
         case "color" where parts.count == 2:
             let mapping: [String: AtomColorMode] = [
                 "element": .element, "chain": .chain, "residue": .residue,
@@ -222,7 +223,7 @@ final class WorkspaceStore: ObservableObject {
         case "select" where parts.dropFirst().first == "clear":
             clearSelection()
         case "help":
-            statusMessage = "open 1crn · open emd-1001 · style ball|spacefill|sticks|backbone · color element|chain|residue|mono · surface level N"
+            statusMessage = "open 1crn · open emd-1001 · style ball|spacefill|sticks|cartoon|backbone · color element|chain|residue|mono · surface level N"
         default:
             errorMessage = "Unknown command. Type help for supported commands."
         }

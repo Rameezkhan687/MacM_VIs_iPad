@@ -100,6 +100,11 @@ enum MolecularSceneBuilder {
         selection: Set<Int>,
         to parent: SCNNode
     ) {
+        if settings.representation == .cartoon {
+            addCartoon(structure, settings: settings, selection: selection, to: parent)
+            return
+        }
+
         let atoms: [Atom]
         if settings.representation == .backbone {
             atoms = structure.atoms.filter { $0.name.uppercased() == "CA" || $0.name.uppercased() == "P" }
@@ -137,6 +142,7 @@ enum MolecularSceneBuilder {
             switch settings.representation {
             case .spacefill: radius = CGFloat(ElementTable.vanDerWaalsRadius(for: atom.element)) * 0.62
             case .sticks: radius = 0.18
+            case .cartoon: radius = 0.22
             case .backbone: radius = 0.22
             case .ballAndStick: radius = CGFloat(ElementTable.covalentRadius(for: atom.element)) * 0.48
             }
@@ -164,6 +170,298 @@ enum MolecularSceneBuilder {
                 node.addChildNode(SCNNode(geometry: halo))
             }
         }
+    }
+
+    private struct CartoonResidue {
+        let atom: Atom
+        let kind: SecondaryStructureKind
+    }
+
+    private static func addCartoon(
+        _ structure: MolecularStructure,
+        settings: RenderSettings,
+        selection: Set<Int>,
+        to parent: SCNNode
+    ) {
+        let chains = cartoonChains(structure)
+        for chain in chains {
+            for fragment in contiguousFragments(chain) {
+                addCartoonFragment(fragment, settings: settings, to: parent)
+            }
+        }
+        addSelectionMarkers(structure: structure, selection: selection, to: parent)
+    }
+
+    private static func cartoonChains(_ structure: MolecularStructure) -> [[CartoonResidue]] {
+        var chainOrder: [String] = []
+        var chains: [String: [CartoonResidue]] = [:]
+        var seenResidues = Set<String>()
+
+        for atom in structure.atoms.prefix(200_000) {
+            let atomName = atom.name.uppercased()
+            guard atomName == "CA" || atomName == "P" else { continue }
+            let residueKey = "\(atom.chainID):\(atom.residueNumber)"
+            guard seenResidues.insert(residueKey).inserted else { continue }
+            if chains[atom.chainID] == nil {
+                chainOrder.append(atom.chainID)
+                chains[atom.chainID] = []
+            }
+            chains[atom.chainID, default: []].append(CartoonResidue(
+                atom: atom,
+                kind: structure.secondaryStructureKind(
+                    chainID: atom.chainID,
+                    residueNumber: atom.residueNumber
+                )
+            ))
+        }
+        return chainOrder.compactMap { chains[$0] }
+    }
+
+    private static func contiguousFragments(_ residues: [CartoonResidue]) -> [[CartoonResidue]] {
+        guard !residues.isEmpty else { return [] }
+        var fragments: [[CartoonResidue]] = [[residues[0]]]
+        for residue in residues.dropFirst() {
+            guard let previous = fragments.last?.last else { continue }
+            let residueGap = residue.atom.residueNumber - previous.atom.residueNumber
+            let distance = (residue.atom.position - previous.atom.position).length
+            if residueGap <= 0 || residueGap > 1 || distance > 7 {
+                fragments.append([residue])
+            } else {
+                fragments[fragments.count - 1].append(residue)
+            }
+        }
+        return fragments
+    }
+
+    private static func addCartoonFragment(
+        _ residues: [CartoonResidue],
+        settings: RenderSettings,
+        to parent: SCNNode
+    ) {
+        guard !residues.isEmpty else { return }
+        var runStart = 0
+        while runStart < residues.count {
+            var runEnd = runStart
+            while runEnd + 1 < residues.count, residues[runEnd + 1].kind == residues[runStart].kind {
+                runEnd += 1
+            }
+
+            let displayStart = max(0, runStart - 1)
+            let displayEnd = min(residues.count - 1, runEnd + 1)
+            let run = Array(residues[displayStart...displayEnd])
+            let kind = residues[runStart].kind
+            let color = cartoonColor(for: kind, atom: residues[runStart].atom, mode: settings.colorMode)
+            let scale = Float(settings.atomScale)
+
+            switch kind {
+            case .helix:
+                if let geometry = ribbonGeometry(
+                    points: run.map(\.atom.position),
+                    halfWidth: 0.62 * scale,
+                    arrowhead: false,
+                    color: color
+                ) {
+                    let node = SCNNode(geometry: geometry)
+                    node.name = "atom:\(residues[(runStart + runEnd) / 2].atom.id)"
+                    parent.addChildNode(node)
+                }
+            case .sheet:
+                if let geometry = ribbonGeometry(
+                    points: run.map(\.atom.position),
+                    halfWidth: 0.82 * scale,
+                    arrowhead: true,
+                    color: color
+                ) {
+                    let node = SCNNode(geometry: geometry)
+                    node.name = "atom:\(residues[(runStart + runEnd) / 2].atom.id)"
+                    parent.addChildNode(node)
+                }
+            case .coil:
+                addCoil(
+                    points: run.map(\.atom.position),
+                    atomID: residues[(runStart + runEnd) / 2].atom.id,
+                    radius: CGFloat(0.16 * scale),
+                    color: color,
+                    to: parent
+                )
+            }
+            runStart = runEnd + 1
+        }
+    }
+
+    private static func addCoil(
+        points: [Vector3],
+        atomID: Int,
+        radius: CGFloat,
+        color: UIColor,
+        to parent: SCNNode
+    ) {
+        let smoothed = smooth(points)
+        if smoothed.count == 1, let point = smoothed.first {
+            let sphere = SCNSphere(radius: radius)
+            sphere.segmentCount = 10
+            sphere.materials = [cartoonMaterial(color: color)]
+            let node = SCNNode(geometry: sphere)
+            node.name = "atom:\(atomID)"
+            node.simdPosition = point
+            parent.addChildNode(node)
+            return
+        }
+        for (index, pair) in zip(smoothed, smoothed.dropFirst()).enumerated() {
+            let node = cylinder(
+                from: vector3(pair.0),
+                to: vector3(pair.1),
+                radius: radius,
+                color: color
+            )
+            node.name = index == smoothed.count / 2 ? "atom:\(atomID)" : "cartoon-coil"
+            parent.addChildNode(node)
+        }
+    }
+
+    private static func ribbonGeometry(
+        points: [Vector3],
+        halfWidth: Float,
+        arrowhead: Bool,
+        color: UIColor
+    ) -> SCNGeometry? {
+        let centers = smooth(points)
+        guard centers.count >= 2 else { return nil }
+
+        var vertices: [SCNVector3] = []
+        var normals: [SCNVector3] = []
+        var previousWidth = SIMD3<Float>(1, 0, 0)
+        vertices.reserveCapacity(centers.count * 2)
+        normals.reserveCapacity(centers.count * 2)
+
+        for index in centers.indices {
+            let previous = centers[max(0, index - 1)]
+            let next = centers[min(centers.count - 1, index + 1)]
+            var tangent = next - previous
+            if simd_length_squared(tangent) < 0.000_001 { tangent = SIMD3<Float>(0, 0, 1) }
+            tangent = simd_normalize(tangent)
+
+            var width = previousWidth - tangent * simd_dot(previousWidth, tangent)
+            if simd_length_squared(width) < 0.000_1 {
+                let reference = abs(tangent.y) < 0.9 ? SIMD3<Float>(0, 1, 0) : SIMD3<Float>(1, 0, 0)
+                width = simd_cross(tangent, reference)
+            }
+            width = simd_normalize(width)
+            if simd_dot(width, previousWidth) < 0 { width = -width }
+            previousWidth = width
+
+            let widthScale = ribbonWidthScale(index: index, count: centers.count, arrowhead: arrowhead)
+            let offset = width * halfWidth * widthScale
+            let normalVector = simd_normalize(simd_cross(tangent, width))
+            vertices.append(SCNVector3(centers[index] - offset))
+            vertices.append(SCNVector3(centers[index] + offset))
+            let normal = SCNVector3(normalVector)
+            normals.append(contentsOf: [normal, normal])
+        }
+
+        var indices: [Int32] = []
+        indices.reserveCapacity((centers.count - 1) * 6)
+        for index in 0..<(centers.count - 1) {
+            let left = Int32(index * 2)
+            indices.append(contentsOf: [left, left + 1, left + 2, left + 1, left + 3, left + 2])
+        }
+        let geometry = SCNGeometry(
+            sources: [SCNGeometrySource(vertices: vertices), SCNGeometrySource(normals: normals)],
+            elements: [SCNGeometryElement(indices: indices, primitiveType: .triangles)]
+        )
+        geometry.materials = [cartoonMaterial(color: color)]
+        return geometry
+    }
+
+    private static func ribbonWidthScale(index: Int, count: Int, arrowhead: Bool) -> Float {
+        guard arrowhead, count > 2 else { return 1 }
+        let progress = Float(index) / Float(count - 1)
+        if progress < 0.68 { return 1 }
+        if progress < 0.82 { return 1 + (progress - 0.68) / 0.14 * 0.55 }
+        return max(0.025, (1 - progress) / 0.18 * 1.55)
+    }
+
+    private static func smooth(_ points: [Vector3], subdivisions: Int = 4) -> [SIMD3<Float>] {
+        let vectors = points.map { SIMD3<Float>($0.x, $0.y, $0.z) }
+        guard vectors.count > 1 else { return vectors }
+        var result: [SIMD3<Float>] = []
+        result.reserveCapacity((vectors.count - 1) * subdivisions + 1)
+        for index in 0..<(vectors.count - 1) {
+            let p0 = vectors[max(0, index - 1)]
+            let p1 = vectors[index]
+            let p2 = vectors[index + 1]
+            let p3 = vectors[min(vectors.count - 1, index + 2)]
+            for step in 0..<subdivisions {
+                let t = Float(step) / Float(subdivisions)
+                let t2 = t * t
+                let t3 = t2 * t
+                let base = p1 * Float(2)
+                let linear = (p2 - p0) * t
+                var quadraticShape = p0 * Float(2)
+                quadraticShape -= p1 * Float(5)
+                quadraticShape += p2 * Float(4)
+                quadraticShape -= p3
+                let quadratic = quadraticShape * t2
+                var cubicShape = -p0
+                cubicShape += p1 * Float(3)
+                cubicShape -= p2 * Float(3)
+                cubicShape += p3
+                let cubic = cubicShape * t3
+                let firstHalf = base + linear
+                let secondHalf = quadratic + cubic
+                result.append((firstHalf + secondHalf) * Float(0.5))
+            }
+        }
+        result.append(vectors[vectors.count - 1])
+        return result
+    }
+
+    private static func addSelectionMarkers(
+        structure: MolecularStructure,
+        selection: Set<Int>,
+        to parent: SCNNode
+    ) {
+        for atom in structure.atoms where selection.contains(atom.id) {
+            let halo = SCNSphere(radius: 0.34)
+            halo.segmentCount = 12
+            let material = SCNMaterial()
+            material.diffuse.contents = UIColor.clear
+            material.emission.contents = UIColor.systemYellow
+            material.transparency = 0.9
+            material.fillMode = .lines
+            halo.materials = [material]
+            let node = SCNNode(geometry: halo)
+            node.name = "atom:\(atom.id)"
+            node.position = SCNVector3(atom.position.x, atom.position.y, atom.position.z)
+            parent.addChildNode(node)
+        }
+    }
+
+    private static func cartoonColor(
+        for kind: SecondaryStructureKind,
+        atom: Atom,
+        mode: AtomColorMode
+    ) -> UIColor {
+        guard mode == .element else { return color(for: atom, mode: mode) }
+        switch kind {
+        case .helix: return UIColor(red: 0.92, green: 0.28, blue: 0.38, alpha: 1)
+        case .sheet: return UIColor(red: 0.96, green: 0.73, blue: 0.15, alpha: 1)
+        case .coil: return UIColor(red: 0.22, green: 0.76, blue: 0.70, alpha: 1)
+        }
+    }
+
+    private static func cartoonMaterial(color: UIColor) -> SCNMaterial {
+        let material = SCNMaterial()
+        material.diffuse.contents = color
+        material.roughness.contents = 0.36
+        material.metalness.contents = 0.02
+        material.lightingModel = .physicallyBased
+        material.isDoubleSided = true
+        return material
+    }
+
+    private static func vector3(_ value: SIMD3<Float>) -> Vector3 {
+        Vector3(x: value.x, y: value.y, z: value.z)
     }
 
     private static func cylinder(from a: Vector3, to b: Vector3, radius: CGFloat, color: UIColor) -> SCNNode {

@@ -4,6 +4,7 @@ enum MolecularRepresentation: String, CaseIterable, Identifiable {
     case ballAndStick = "Ball & Stick"
     case spacefill = "Spacefill"
     case sticks = "Sticks"
+    case cartoon = "Cartoon"
     case backbone = "Backbone"
 
     var id: Self { self }

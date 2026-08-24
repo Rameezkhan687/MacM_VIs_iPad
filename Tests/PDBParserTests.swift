@@ -21,4 +21,26 @@ struct PDBParserTests {
         #expect(structure.radius > 5)
         #expect(abs(structure.center.y) < 2)
     }
+
+    @Test func parsesHelixAndSheetAnnotations() throws {
+        let annotatedPDB = """
+        HELIX    1  HA GLY A   86  GLY A   94  1                                   9
+        SHEET    1   A 5 THR A 107  ARG A 110  0
+        \(SampleData.miniProteinPDB)
+        """
+        let structure = try PDBParser().parse(annotatedPDB)
+
+        #expect(structure.secondaryStructure.count == 2)
+        #expect(structure.secondaryStructure[0] == SecondaryStructureSegment(
+            kind: .helix,
+            chainID: "A",
+            startResidue: 86,
+            endResidue: 94
+        ))
+        #expect(structure.secondaryStructure[1].kind == .sheet)
+        #expect(structure.secondaryStructure[1].startResidue == 107)
+        #expect(structure.secondaryStructure[1].endResidue == 110)
+        #expect(structure.secondaryStructureKind(chainID: "A", residueNumber: 90) == .helix)
+        #expect(structure.secondaryStructureKind(chainID: "A", residueNumber: 105) == .coil)
+    }
 }

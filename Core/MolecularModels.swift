@@ -80,17 +80,49 @@ public struct Bond: Codable, Hashable, Sendable {
     }
 }
 
+public enum SecondaryStructureKind: String, Codable, Hashable, Sendable {
+    case helix
+    case sheet
+    case coil
+}
+
+public struct SecondaryStructureSegment: Codable, Hashable, Sendable {
+    public let kind: SecondaryStructureKind
+    public let chainID: String
+    public let startResidue: Int
+    public let endResidue: Int
+
+    public init(kind: SecondaryStructureKind, chainID: String, startResidue: Int, endResidue: Int) {
+        self.kind = kind
+        self.chainID = chainID
+        self.startResidue = min(startResidue, endResidue)
+        self.endResidue = max(startResidue, endResidue)
+    }
+
+    public func contains(chainID: String, residueNumber: Int) -> Bool {
+        self.chainID == chainID && residueNumber >= startResidue && residueNumber <= endResidue
+    }
+}
+
 public struct MolecularStructure: Identifiable, Codable, Sendable {
     public let id: UUID
     public var name: String
     public var atoms: [Atom]
     public var bonds: [Bond]
+    public var secondaryStructure: [SecondaryStructureSegment]
 
-    public init(id: UUID = UUID(), name: String, atoms: [Atom], bonds: [Bond]) {
+    public init(
+        id: UUID = UUID(),
+        name: String,
+        atoms: [Atom],
+        bonds: [Bond],
+        secondaryStructure: [SecondaryStructureSegment] = []
+    ) {
         self.id = id
         self.name = name
         self.atoms = atoms
         self.bonds = bonds
+        self.secondaryStructure = secondaryStructure
     }
 
     public var center: Vector3 {
@@ -105,6 +137,12 @@ public struct MolecularStructure: Identifiable, Codable, Sendable {
 
     public var chainIDs: [String] {
         Array(Set(atoms.map(\.chainID))).sorted()
+    }
+
+    public func secondaryStructureKind(chainID: String, residueNumber: Int) -> SecondaryStructureKind {
+        secondaryStructure.first {
+            $0.contains(chainID: chainID, residueNumber: residueNumber)
+        }?.kind ?? .coil
     }
 }
 

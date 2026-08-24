@@ -5,6 +5,7 @@ DerivedData/
 .deviceDerivedData/
 .typecheckCache/
 .swiftpm-cache/
+.swiftpm-module-cache/
 .swiftpm-config/
 .swiftpm-security/
 xcuserdata/

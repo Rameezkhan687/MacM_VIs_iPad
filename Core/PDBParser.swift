@@ -14,6 +14,7 @@ public struct PDBParser: Sendable {
         var atoms: [Atom] = []
         var serialToID: [Int: Int] = [:]
         var explicitBonds = Set<Bond>()
+        var secondaryStructure: [SecondaryStructureSegment] = []
 
         for line in text.split(whereSeparator: \.isNewline).map(String.init) {
             let record = field(line, 0, 6).trimmingCharacters(in: .whitespaces)
@@ -54,6 +55,24 @@ public struct PDBParser: Sendable {
                         explicitBonds.insert(Bond(atom1: sourceID, atom2: targetID))
                     }
                 }
+            } else if record == "HELIX" {
+                appendSecondaryStructure(
+                    kind: .helix,
+                    startChain: field(line, 19, 20),
+                    startResidue: field(line, 21, 25),
+                    endChain: field(line, 31, 32),
+                    endResidue: field(line, 33, 37),
+                    to: &secondaryStructure
+                )
+            } else if record == "SHEET" {
+                appendSecondaryStructure(
+                    kind: .sheet,
+                    startChain: field(line, 21, 22),
+                    startResidue: field(line, 22, 26),
+                    endChain: field(line, 32, 33),
+                    endResidue: field(line, 33, 37),
+                    to: &secondaryStructure
+                )
             }
         }
 
@@ -62,9 +81,35 @@ public struct PDBParser: Sendable {
         }
 
         let bonds = explicitBonds.isEmpty ? BondInference.infer(atoms: atoms) : Array(explicitBonds)
-        return MolecularStructure(name: name, atoms: atoms, bonds: bonds.sorted {
-            $0.atom1 == $1.atom1 ? $0.atom2 < $1.atom2 : $0.atom1 < $1.atom1
-        })
+        return MolecularStructure(
+            name: name,
+            atoms: atoms,
+            bonds: bonds.sorted {
+                $0.atom1 == $1.atom1 ? $0.atom2 < $1.atom2 : $0.atom1 < $1.atom1
+            },
+            secondaryStructure: secondaryStructure
+        )
+    }
+
+    private func appendSecondaryStructure(
+        kind: SecondaryStructureKind,
+        startChain: String,
+        startResidue: String,
+        endChain: String,
+        endResidue: String,
+        to segments: inout [SecondaryStructureSegment]
+    ) {
+        let chainID = startChain.trimmingCharacters(in: .whitespaces)
+        let endingChainID = endChain.trimmingCharacters(in: .whitespaces)
+        guard endingChainID.isEmpty || chainID == endingChainID,
+              let start = Int(startResidue.trimmingCharacters(in: .whitespaces)),
+              let end = Int(endResidue.trimmingCharacters(in: .whitespaces)) else { return }
+        segments.append(SecondaryStructureSegment(
+            kind: kind,
+            chainID: chainID,
+            startResidue: start,
+            endResidue: end
+        ))
     }
 
     private func field(_ line: String, _ start: Int, _ end: Int) -> String {

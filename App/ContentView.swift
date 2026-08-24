@@ -484,6 +484,7 @@ private struct HelpSheet: View {
                 Section("Commands") {
                     command("open 1crn", "Fetch a PDB structure")
                     command("open emd-1001", "Fetch an EMDB density map")
+                    command("style cartoon", "Show helices, sheet arrows, and coils")
                     command("style spacefill", "Change representation")
                     command("color chain", "Color atoms by chain")
                     command("surface level 0.8", "Set the map contour")

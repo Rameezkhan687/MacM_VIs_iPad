@@ -10,7 +10,8 @@ MoleculePad is a clean-room, touch-first molecular visualization workspace for i
 - Direct primary-map downloads from EMDB using `EMD-` accession IDs
 - MRC/CCP4 density maps (`.mrc`, `.map`, `.ccp4`, and gzip-compressed variants), including modes 0, 1, 2, and 6
 - Interactive density isosurfaces with contour, color, opacity, and wireframe controls
-- Ball-and-stick, spacefill, sticks, and backbone representations
+- Ball-and-stick, spacefill, sticks, backbone, and cartoon representations
+- Cartoon helices, beta-sheet arrows, and smooth coil traces from PDB secondary-structure records
 - Element, chain, residue, and monochrome coloring
 - Touch rotation, pan, zoom, atom picking, and two-atom distance measurements
 - A compact command bar (`help` lists the implemented commands)
@@ -35,7 +36,7 @@ swift test
 
 ## Scope and roadmap
 
-This is a functional foundation, not feature parity with the decades-old desktop ChimeraX codebase. High-value next layers are mmCIF, segmented map regions, molecular surfaces, ribbons, symmetry, fitting, session files, image/movie export, DICOM, and an extensible analysis-command engine. A literal ChimeraX port or redistributed derivative requires prior written permission from UCSF under its published license.
+This is a functional foundation, not feature parity with the decades-old desktop ChimeraX codebase. High-value next layers are mmCIF, segmented map regions, molecular surfaces, symmetry, fitting, session files, image/movie export, DICOM, and an extensible analysis-command engine. A literal ChimeraX port or redistributed derivative requires prior written permission from UCSF under its published license.
 
 ## Attribution
 
